@@ -86,8 +86,14 @@ export function usePromptTaskPolling({
           completedMap.set(t.id, t.status);
         }
 
-        // 函数式更新：读取最新 tasks 状态
-        let shouldContinue = false;
+        // 从 API 响应直接判断是否需要继续轮询
+        // 注意：不能用 setTasks updater 内部的副作用来设置 shouldContinue，
+        // 因为 React 18 自动批处理导致 updater 在 render 阶段才执行，不是同步的
+        const hasActiveInResponse = (data.active || []).some(
+          (t: { status: string }) => ACTIVE_STATUSES.includes(t.status)
+        );
+
+        // 函数式更新：处理完成的任务，更新活跃任务状态
         setTasks((prev) => {
           const completedIds = new Set<string>();
 
@@ -122,7 +128,7 @@ export function usePromptTaskPolling({
             }
           }
 
-          const updated = prev
+          return prev
             .filter((t) => !completedIds.has(t.id))
             .map((t) => {
               const newStatus = activeMap.get(t.id);
@@ -131,13 +137,10 @@ export function usePromptTaskPolling({
               }
               return t;
             });
-
-          shouldContinue = updated.some((t) => ACTIVE_STATUSES.includes(t.status));
-          return updated;
         });
 
-        // 决定是否继续轮询
-        if (shouldContinue && !cancelled) {
+        // 从 API 响应直接决定是否继续轮询
+        if (hasActiveInResponse && !cancelled) {
           timeoutId = setTimeout(tick, getDelay());
         }
       } catch {
