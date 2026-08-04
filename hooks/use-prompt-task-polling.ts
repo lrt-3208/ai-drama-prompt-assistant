@@ -19,13 +19,18 @@ interface UsePromptTaskPollingOptions {
   onTaskDone?: (shotId: string, promptType: string, status: string) => void;
 }
 
+const TERMINAL_STATUSES = ["success", "partial", "failed"];
+const ACTIVE_STATUSES = ["pending", "running"];
+
 /**
  * 多任务并发轮询 hook（专为 Prompt 工作台设计）
  *
- * 与 useTaskPolling 的区别：
- * - 支持同一时间多个 generate_prompt 任务并发
- * - 按镜头+类型粒度跟踪加载状态
- * - 单个 3s interval 轮询所有活跃任务
+ * 优化点：
+ * - 单次 GET /tasks/active 批量查询所有任务状态（1 请求替代 N 请求）
+ * - 自适应轮询间隔：3s → 5s(30s后) → 8s(60s后)
+ * - 无活跃任务时自动停止轮询
+ * - 新任务创建时重置为 3s 快速轮询
+ * - 使用 setTasks 函数式更新，无需 tasks ref（避免 stale closure）
  */
 export function usePromptTaskPolling({
   projectId,
@@ -34,16 +39,122 @@ export function usePromptTaskPolling({
 }: UsePromptTaskPollingOptions) {
   const [tasks, setTasks] = useState<PromptTask[]>(initialTasks);
 
-  // ref 镜像，interval 读取 ref 避免依赖循环
-  const tasksRef = useRef(tasks);
-  useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
-
   const onTaskDoneRef = useRef(onTaskDone);
   useEffect(() => {
     onTaskDoneRef.current = onTaskDone;
   }, [onTaskDone]);
+
+  // 已触发过 onDone 的任务 ID（避免重复回调）
+  const doneSetRef = useRef<Set<string>>(new Set());
+
+  // 是否有活跃任务（控制轮询启停）
+  const hasActiveTask = tasks.some((t) => ACTIVE_STATUSES.includes(t.status));
+
+  // 轮询：单请求批量查询 + 自适应间隔
+  useEffect(() => {
+    if (!hasActiveTask) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let cancelled = false;
+    const startTime = Date.now();
+
+    const getDelay = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 60000) return 8000;
+      if (elapsed > 30000) return 5000;
+      return 3000;
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+
+      try {
+        const res = await fetch(`/api/projects/${projectId}/tasks/active`);
+        if (!res.ok) {
+          if (!cancelled) timeoutId = setTimeout(tick, getDelay());
+          return;
+        }
+        const data = await res.json();
+
+        // 构建 ID → status 映射
+        const activeMap = new Map<string, string>();
+        for (const t of data.active || []) {
+          activeMap.set(t.id, t.status);
+        }
+        const completedMap = new Map<string, string>();
+        for (const t of data.recentlyCompleted || []) {
+          completedMap.set(t.id, t.status);
+        }
+
+        // 函数式更新：读取最新 tasks 状态
+        let shouldContinue = false;
+        setTasks((prev) => {
+          const completedIds = new Set<string>();
+
+          for (const task of prev) {
+            if (!ACTIVE_STATUSES.includes(task.status)) continue;
+
+            // 在 recentlyCompleted 中 → 触发 onDone
+            const completedStatus = completedMap.get(task.id);
+            const activeStatus = activeMap.get(task.id);
+
+            if (completedStatus && TERMINAL_STATUSES.includes(completedStatus)) {
+              if (!doneSetRef.current.has(task.id)) {
+                doneSetRef.current.add(task.id);
+                completedIds.add(task.id);
+                onTaskDoneRef.current?.(
+                  task.payload.shotId,
+                  task.payload.promptType,
+                  completedStatus
+                );
+              }
+            } else if (activeStatus && TERMINAL_STATUSES.includes(activeStatus)) {
+              // 在 active 中但状态已变为终态
+              if (!doneSetRef.current.has(task.id)) {
+                doneSetRef.current.add(task.id);
+                completedIds.add(task.id);
+                onTaskDoneRef.current?.(
+                  task.payload.shotId,
+                  task.payload.promptType,
+                  activeStatus
+                );
+              }
+            }
+          }
+
+          const updated = prev
+            .filter((t) => !completedIds.has(t.id))
+            .map((t) => {
+              const newStatus = activeMap.get(t.id);
+              if (newStatus && newStatus !== t.status && ACTIVE_STATUSES.includes(newStatus)) {
+                return { ...t, status: newStatus };
+              }
+              return t;
+            });
+
+          shouldContinue = updated.some((t) => ACTIVE_STATUSES.includes(t.status));
+          return updated;
+        });
+
+        // 决定是否继续轮询
+        if (shouldContinue && !cancelled) {
+          timeoutId = setTimeout(tick, getDelay());
+        }
+      } catch {
+        // 网络错误 → 继续轮询
+        if (!cancelled) {
+          timeoutId = setTimeout(tick, getDelay());
+        }
+      }
+    };
+
+    timeoutId = setTimeout(tick, getDelay());
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [hasActiveTask, projectId]);
 
   // 初始 pending 任务 → 调 wakeup 恢复
   useEffect(() => {
@@ -54,56 +165,6 @@ export function usePromptTaskPolling({
       }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 单个 interval 轮询所有活跃任务
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const activeTasks = tasksRef.current.filter((t) =>
-        ["pending", "running"].includes(t.status)
-      );
-      if (activeTasks.length === 0) return;
-
-      const completedIds = new Set<string>();
-      const statusUpdates = new Map<string, string>();
-
-      for (const task of activeTasks) {
-        try {
-          const res = await fetch(`/api/tasks/${task.id}`);
-          if (!res.ok) continue;
-          const data = await res.json();
-
-          if (data.status !== task.status) {
-            if (["success", "partial", "failed"].includes(data.status)) {
-              completedIds.add(task.id);
-              onTaskDoneRef.current?.(
-                task.payload.shotId,
-                task.payload.promptType,
-                data.status
-              );
-            } else {
-              statusUpdates.set(task.id, data.status);
-            }
-          }
-        } catch {
-          // 网络错误忽略
-        }
-      }
-
-      if (completedIds.size > 0 || statusUpdates.size > 0) {
-        setTasks((prev) =>
-          prev
-            .filter((t) => !completedIds.has(t.id))
-            .map((t) =>
-              statusUpdates.has(t.id)
-                ? { ...t, status: statusUpdates.get(t.id)! }
-                : t
-            )
-        );
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
   }, []);
 
   // 创建新的 prompt 任务
@@ -150,7 +211,7 @@ export function usePromptTaskPolling({
         (t) =>
           t.payload.shotId === shotId &&
           t.payload.promptType === promptType &&
-          ["pending", "running"].includes(t.status)
+          ACTIVE_STATUSES.includes(t.status)
       );
     },
     [tasks]
