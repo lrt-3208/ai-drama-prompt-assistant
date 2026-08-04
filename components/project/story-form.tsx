@@ -90,9 +90,13 @@ export function StoryForm({ projectId, initialStory, activeTask }: { projectId: 
   };
 
   // 重新分析故事
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     toast.info("AI 分析中，请稍候...");
-    createTask("regenerate_story");
+    try {
+      await createTask("regenerate_story");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   // 触发全量资产重新初始化

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
+import { executeGenerationTask } from "@/lib/tasks/generation-handlers";
+
+// Vercel: after() 执行 AI 任务需要足够的运行时间
+export const maxDuration = 60;
 
 // 允许的 task_type 列表
 const ALLOWED_TASK_TYPES = [
@@ -22,11 +28,10 @@ const ALLOWED_TASK_TYPES = [
  * Body: { taskType: "regenerate_characters", payload: { customPrompt: "..." } }
  * Response: { taskId: "xxx", status: "pending" }
  *
- * 逻辑与 initialize/route.ts 的 POST 一致：
  * 1. 验证用户 + 项目归属
- * 2. INSERT project_tasks（task_type + payload）
- * 3. 唯一索引冲突 → 409 返回现有 taskId
- * 4. fire-and-forget task-runner
+ * 2. 验证 AI 配置（api_key + api_base 必须已配置）
+ * 3. INSERT project_tasks
+ * 4. after() 直接执行任务（Vercel 不支持 fire-and-forget fetch）
  * 5. 返回 taskId
  */
 export async function POST(
@@ -56,7 +61,21 @@ export async function POST(
     return NextResponse.json({ error: "项目不存在" }, { status: 404 });
   }
 
-  // 2. 解析 body
+  // 2. 验证 AI 配置
+  const { data: aiConfig } = await supabase
+    .from("ai_config")
+    .select("api_key, api_base, model")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (!aiConfig?.api_key || !aiConfig?.api_base) {
+    return NextResponse.json(
+      { error: "AI 模型未配置，请先到设置页面填写 API 地址和 API Key" },
+      { status: 400 }
+    );
+  }
+
+  // 3. 解析 body
   const body = await request.json().catch(() => ({}));
   const { taskType, payload } = body as {
     taskType?: string;
@@ -67,7 +86,7 @@ export async function POST(
     return NextResponse.json({ error: `无效的任务类型: ${taskType}` }, { status: 400 });
   }
 
-  // 3. INSERT project_tasks（唯一索引防重复）
+  // 4. INSERT project_tasks
   const { data: task, error: insertError } = await supabase
     .from("project_tasks")
     .insert({
@@ -111,21 +130,19 @@ export async function POST(
     );
   }
 
-  // 4. best effort fire-and-forget 触发 runner
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : `http://localhost:${process.env.PORT || 8888}`;
+  // 5. after() 直接执行任务（Vercel 不支持 fire-and-forget fetch）
+  // 任务在响应发送后执行，maxDuration 内完成
+  const taskId = task.id;
+  after(async () => {
+    try {
+      const serviceClient = createServiceClient();
+      await executeGenerationTask(serviceClient, taskId);
+    } catch (e) {
+      console.error("[tasks] after() execution failed:", e);
+    }
+  });
 
-  void fetch(`${baseUrl}/api/internal/task-runner`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-runner-key": process.env.RUNNER_SECRET!,
-    },
-    body: JSON.stringify({ taskId: task.id }),
-  }).catch(() => {});
-
-  // 5. 返回 taskId
+  // 6. 返回 taskId
   return NextResponse.json(
     { taskId: task.id, status: "pending" },
     { status: 201 }

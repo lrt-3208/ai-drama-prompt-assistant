@@ -55,12 +55,16 @@ export function StyleForm({ projectId, initial, activeTask }: { projectId: strin
     }
   }
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const confirmed = window.confirm("将替换现有风格，是否继续？");
     if (!confirmed) return;
 
-    createTask("regenerate_style", { customPrompt: aiPrompt || undefined });
-    setAiPrompt("");
+    try {
+      await createTask("regenerate_style", { customPrompt: aiPrompt || undefined });
+      setAiPrompt("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {

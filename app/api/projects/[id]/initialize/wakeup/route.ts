@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
+import { executeInitializeTask } from "@/lib/tasks/initialize-assets";
+import { executeGenerationTask } from "@/lib/tasks/generation-handlers";
+
+// Vercel: after() 执行 AI 任务需要足够的运行时间
+export const maxDuration = 60;
 
 /**
  * POST /api/projects/[id]/initialize/wakeup
  *
  * 前端恢复入口：发现 pending 任务时调用
- * secret 不出浏览器 — wakeup 在服务端用 RUNNER_SECRET 调 task-runner
+ * 直接在 after() 中执行任务（Vercel 不支持 fire-and-forget fetch）
  *
  * 架构：
  * Browser（无 secret）
  *   ↓ POST /wakeup
  * wakeup API（验证用户归属）
- *   ↓ server secret
- * task-runner API（验证 secret + 执行 AI）
+ *   ↓ after() 直接执行（service client）
  */
 export async function POST(
   request: NextRequest,
@@ -43,7 +49,7 @@ export async function POST(
   // 2. 查 pending 任务
   const { data: task } = await supabase
     .from("project_tasks")
-    .select("id, status")
+    .select("id, status, task_type")
     .eq("project_id", id)
     .eq("status", "pending")
     .order("created_at", { ascending: false })
@@ -54,19 +60,22 @@ export async function POST(
     return NextResponse.json({ message: "no pending task" });
   }
 
-  // 3. 服务端用 secret 调 task-runner（secret 不出浏览器）
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : `http://localhost:${process.env.PORT || 8888}`;
+  // 3. after() 直接执行任务（根据 task_type dispatch）
+  const taskId = task.id;
+  const taskType = task.task_type;
 
-  void fetch(`${baseUrl}/api/internal/task-runner`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-runner-key": process.env.RUNNER_SECRET!,
-    },
-    body: JSON.stringify({ taskId: task.id }),
-  }).catch(() => {});
+  after(async () => {
+    try {
+      const serviceClient = createServiceClient();
+      if (taskType === "initialize_assets") {
+        await executeInitializeTask(serviceClient, taskId);
+      } else {
+        await executeGenerationTask(serviceClient, taskId);
+      }
+    } catch (e) {
+      console.error("[wakeup] after() execution failed:", e);
+    }
+  });
 
   return NextResponse.json({ taskId: task.id, status: "waking_up" });
 }

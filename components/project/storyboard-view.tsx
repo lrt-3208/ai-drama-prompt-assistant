@@ -84,15 +84,23 @@ export function StoryboardView({
   }
 
   // 生成全量分镜
-  const handleGenerateAll = () => {
+  const handleGenerateAll = async () => {
     toast.info("AI 全量生成分镜中，通常需要 2-5 分钟，请耐心等待...");
-    createTask("generate_storyboard");
+    try {
+      await createTask("generate_storyboard");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   // 按集生成分镜
-  const handleGenerateEpisode = (episodeNumber: number) => {
+  const handleGenerateEpisode = async (episodeNumber: number) => {
     toast.info(`AI 生成第 ${episodeNumber} 集分镜中，通常需要 30-60 秒...`);
-    createTask("generate_storyboard_episode", { episodeNumber });
+    try {
+      await createTask("generate_storyboard_episode", { episodeNumber });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   // 状态徽章

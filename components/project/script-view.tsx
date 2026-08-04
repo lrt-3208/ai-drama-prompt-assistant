@@ -57,9 +57,13 @@ export function ScriptView({
     },
   });
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     toast.info("AI 生成剧本中，通常需要 30-60 秒，请耐心等待...");
-    createTask("generate_script");
+    try {
+      await createTask("generate_script");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   if (!initial) {

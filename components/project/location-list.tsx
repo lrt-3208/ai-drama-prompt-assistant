@@ -57,14 +57,18 @@ export function LocationList({ projectId, initial, activeTask }: { projectId: st
     setOpen(true);
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const confirmed = window.confirm(
       "AI 将重新生成场景，已有场景会被更新或新增，AI 不会删除你的场景，是否继续？"
     );
     if (!confirmed) return;
 
-    createTask("regenerate_locations", { customPrompt: aiPrompt || undefined });
-    setAiPrompt("");
+    try {
+      await createTask("regenerate_locations", { customPrompt: aiPrompt || undefined });
+      setAiPrompt("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {

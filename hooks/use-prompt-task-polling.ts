@@ -123,6 +123,9 @@ export function usePromptTaskPolling({
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "创建任务失败");
+      }
 
       if (data.taskId) {
         setTasks((prev) => [

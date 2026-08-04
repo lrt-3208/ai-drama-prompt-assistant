@@ -91,6 +91,9 @@ export function useTaskPolling({
         body: JSON.stringify({ taskType, payload }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "创建任务失败");
+      }
       if (data.taskId) {
         setTaskId(data.taskId);
         setTaskStatus("pending");

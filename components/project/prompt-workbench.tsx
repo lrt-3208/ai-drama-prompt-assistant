@@ -345,7 +345,7 @@ export function PromptWorkbench({
   };
 
   // 生成 Prompt
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!targetShotId || !selectedPlatform) {
       toast.error("请选择平台");
       return;
@@ -356,7 +356,11 @@ export function PromptWorkbench({
 
     setShowPlatformDialog(false);
     toast.info("AI 生成中，通常需要 30-60 秒，可同时生成其他镜头...");
-    createPromptTask(targetShotId, genType, selectedPlatform, platform.lang);
+    try {
+      await createPromptTask(targetShotId, genType, selectedPlatform, platform.lang);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "创建任务失败");
+    }
   };
 
   // 打开详情 Dialog
