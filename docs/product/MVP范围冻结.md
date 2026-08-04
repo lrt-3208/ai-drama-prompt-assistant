@@ -119,11 +119,15 @@ Story → Script（AI 生成）。
 | characters | 人物列表 |
 | relationships | 人物关系 |
 | worldview | 世界观 |
-| plot_outline | 剧情大纲（按集） |
+| plot_outline | 剧情大纲（剧情段落，非按集） |
+| episode_outline | v2 新增：分集大纲 [{episode, title, outline}]，按集生成分镜时只传该集大纲 |
 
 ### 1.8 分镜生成
 
 Episode → Scene → Shot（AI 生成）。
+
+**v2 新增：按集生成**。支持单集独立生成，只传该集 episode_outline，不传整个剧本。
+**v2 新增：episode.status**（draft/generating/storyboarded/completed/failed），支持并发生成保护（409）。
 
 **Shot 冻结字段**：
 
@@ -139,12 +143,19 @@ Episode → Scene → Shot（AI 生成）。
 
 ### 1.9 Prompt 生成
 
-**MVP 只实现**：
+**v2 变更**：
+
+- 图片 Prompt：增加 OpenAI Image（openai_image）为默认推荐平台
+- 视频 Prompt：增加豆包视频（doubao_video）为默认推荐 + 即梦视频（jimeng_video）
+- 视频 Prompt 依赖图片 Prompt（任意平台），保存 source_prompt_id 追溯链路
+- prompt_templates 增加 provider 和 output_language 字段
+
+**MVP 实现**：
 
 | 类型 | 平台 | 状态 |
 |------|------|------|
-| 图片 Prompt | 即梦 / Midjourney / Flux / ComfyUI | ✅ 实现 |
-| 视频 Prompt | 可灵 / Runway / LTX | ✅ 实现 |
+| 图片 Prompt | OpenAI Image ⭐ / 即梦 / Midjourney / Flux / ComfyUI | ✅ 实现 |
+| 视频 Prompt | 豆包视频 ⭐ / 即梦视频 / 可灵 / Runway / LTX | ✅ 实现 |
 | 声音 Prompt | 豆包TTS / Qwen-TTS | ❌ 接口预留，不实现 |
 | 剪辑 Prompt | — | ❌ 接口预留，不实现 |
 
@@ -172,16 +183,19 @@ V2 文档中的部分字段名在冻结版中简化，映射如下：
 ✅ 用户系统（Auth + RLS）
 ✅ 项目管理（CRUD）
 ✅ 故事输入（story / paste）
-✅ 剧本生成（AI → 结构化 Script）
+✅ 剧本生成（AI → 结构化 Script + episode_outline 分集大纲）
 ✅ 角色资产（CRUD + fixed_prompt）
 ✅ 场景资产（CRUD + fixed_prompt）
 ✅ 视觉风格资产（CRUD + fixed_prompt）
-✅ 分镜生成（Episode → Scene → Shot）
-✅ 图片 Prompt 生成（4 平台 × 2 语言）
-✅ 视频 Prompt 生成（3 平台）
-✅ Prompt 复制 + 编辑 + 保存
-✅ 版本管理（prompt_versions）
+✅ 分镜生成（Episode → Scene → Shot，v2 支持按集生成 + 并发保护 409）
+✅ 图片 Prompt 生成（5 平台：OpenAI Image ⭐ / 即梦 / MJ / Flux / ComfyUI）
+✅ 视频 Prompt 生成（5 平台：豆包视频 ⭐ / 即梦视频 / 可灵 / Runway / LTX）
+✅ 视频 Prompt 依赖图片 Prompt（source_prompt_id 追溯链路）
+✅ prompt_templates 增加 provider + output_language
+✅ GenerationType 枚举化（image_prompt / video_prompt 分开）
+✅ Prompt 复制 + 版本管理（prompt_versions）
 ✅ context_snapshot（记录生成上下文快照）
+✅ AI 配置只读展示（Settings 页面）
 
 ❌ 声音 Prompt 生成（仅接口预留）
 ❌ 剪辑 Prompt 生成（仅接口预留）
@@ -190,6 +204,8 @@ V2 文档中的部分字段名在冻结版中简化，映射如下：
 ❌ Agent 自动编排
 ❌ 多用户协作
 ❌ 商业化系统
+❌ 用户级 AI 配置（MVP 用 env，不使用 profiles）
+❌ shots.image_url（V2 扩展，MVP 通过抽象层处理）
 ```
 
 ---

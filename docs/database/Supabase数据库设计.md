@@ -157,6 +157,7 @@ CREATE TABLE scripts (
   relationships TEXT,
   worldview TEXT,
   plot_outline JSONB DEFAULT '[]',
+  episode_outline JSONB DEFAULT '[]',  -- v2 新增：分集大纲 [{episode, title, outline}]
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -171,10 +172,13 @@ CREATE TABLE episodes (
   episode_number INT NOT NULL,
   title TEXT,
   summary TEXT,
+  status TEXT DEFAULT 'draft'  -- v2 新增：生成状态（draft/generating/storyboarded/completed/failed）
+    CHECK (status IN ('draft','generating','storyboarded','completed','failed')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(project_id, episode_number)
 );
+CREATE INDEX idx_episodes_project_status ON episodes(project_id, status);  -- v2：并发生成查询
 ```
 
 ## 9. scenes
@@ -221,15 +225,18 @@ CREATE INDEX idx_shots_scene_id ON shots(scene_id);
 CREATE TABLE prompt_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   platform TEXT NOT NULL,
+  provider TEXT,  -- v2 新增：服务商（openai/volcengine/jimeng/midjourney/flux/comfyui/kuaishou/runway/ltx）
   prompt_type TEXT NOT NULL CHECK (prompt_type IN ('image','video','voice','edit')),
   language TEXT NOT NULL CHECK (language IN ('zh','en')),
+  output_language TEXT DEFAULT 'zh'  -- v2 新增：输出语言（zh/en/mixed），控制 Prompt 生成的语言风格
+    CHECK (output_language IN ('zh','en','mixed')),
   system_rule TEXT NOT NULL,
   input_fields JSONB DEFAULT '[]',
   output_format TEXT,
   example TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(platform, prompt_type, language)
+  UNIQUE(provider, platform, prompt_type, language)  -- v2：唯一约束加入 provider
 );
 ```
 
@@ -247,6 +254,7 @@ CREATE TABLE prompts (
   platform TEXT,
   language TEXT DEFAULT 'zh' CHECK (language IN ('zh','en')),
   context_snapshot JSONB,    -- 生成时的上下文快照（角色/场景/风格版本）
+  source_prompt_id UUID REFERENCES prompts(id) ON DELETE SET NULL,  -- v2 新增：视频 Prompt 追溯来源图片 Prompt
   created_at TIMESTAMPTZ DEFAULT now(),
   CHECK (
     (shot_id IS NOT NULL AND episode_id IS NULL) OR
