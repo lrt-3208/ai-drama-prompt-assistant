@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // 2. 僵尸回收：清理 >6 分钟未 heartbeat 的 running 任务
-  // locked_at 是最后一次 heartbeat 时间，比 started_at 更准确
+  // 2. 僵尸回收：
+  // a) running 任务 >6 分钟无 heartbeat → failed
   await supabase
     .from("project_tasks")
     .update({
@@ -38,6 +38,17 @@ export async function POST(request: NextRequest) {
     })
     .eq("status", "running")
     .lt("locked_at", new Date(Date.now() - 6 * 60 * 1000).toISOString());
+
+  // b) pending 任务 >5 分钟未被拾取 → failed（after() 可能静默失败）
+  await supabase
+    .from("project_tasks")
+    .update({
+      status: "failed",
+      error: { reason: "pending_timeout" },
+      completed_at: new Date().toISOString(),
+    })
+    .eq("status", "pending")
+    .lt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString());
 
   // 3. 获取任务
   const body = await request.json().catch(() => ({}));

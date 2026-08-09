@@ -1,0 +1,177 @@
+[
+  {
+    "projectId": "proj-001",
+    "locations": [
+      {
+        "name": "林逸的出租屋",
+        "description": "城中村一间小出租屋，面积不大但收拾干净。窗外是嘈杂的街道，窗台上放着几盆绿植",
+        "environment": "室内，白天，光线从窗帘缝隙漏入",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "暖灰色调，简陋但温馨",
+        "fixed_prompt": "A small rental room in an urban village, tidy but cramped, potted plants on windowsill, daylight filtering through curtain gaps, warm gray tones, simple furniture, city noise outside window",
+        "visual_description": "城中村小出租屋，简陋但整洁。窗外阳光透过窗帘缝隙照入，暖灰色调。窗台绿植增添生机"
+      },
+      {
+        "name": "公司写字楼",
+        "description": "现代化高层写字楼，落地玻璃窗俯瞰城市，大理石地面反光",
+        "environment": "室内办公室，白天，日光充足",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "冷色调，蓝灰+银白，现代商务感",
+        "fixed_prompt": "Modern high-rise office building, floor-to-ceiling glass windows overlooking the city, marble floor with reflections, bright daylight, cold blue-gray and silver-white tones, corporate atmosphere",
+        "visual_description": "现代化高层写字楼，落地玻璃窗。大理石地面反光。冷色调蓝灰+银白。商务感十足"
+      },
+      {
+        "name": "天台",
+        "description": "写字楼天台，夜晚城市灯火璀璨，风很大",
+        "environment": "室外天台，夜晚，城市夜景",
+        "time": "夜晚",
+        "weather": "微风",
+        "color_style": "暗蓝色调，城市霓虹灯光点缀",
+        "fixed_prompt": "Rooftop of a high-rise building at night, city lights sparkling below, dark blue tones with neon light accents, strong wind, urban nightscape, dramatic atmosphere",
+        "visual_description": "写字楼天台，夜晚。城市灯火璀璨，暗蓝色调。霓虹灯光点缀。风大，氛围紧张"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-002",
+    "locations": [
+      {
+        "name": "陆家主宅·大堂",
+        "description": "中式豪宅大堂，红木家具，墙上挂山水画，水晶吊灯",
+        "environment": "室内，白天，水晶灯照明+自然光",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "暖金色调，深红+金色，古典奢华",
+        "fixed_prompt": "Grand hall of a Chinese mansion, rosewood furniture, landscape paintings on walls, crystal chandelier, warm golden tones, deep red and gold color scheme, classical luxury, daylight through tall windows",
+        "visual_description": "陆家主宅大堂，红木家具，山水画。水晶吊灯。暖金色调，深红+金色。古典奢华"
+      },
+      {
+        "name": "新房",
+        "description": "中式婚房，红色绸缎装饰，龙凤烛，大红色床品",
+        "environment": "室内，夜晚，烛光",
+        "time": "夜晚",
+        "weather": "无",
+        "color_style": "大红色调，金线刺绣点缀",
+        "fixed_prompt": "Chinese wedding chamber, red silk decorations, dragon and phoenix candles, red beddings with gold embroidery, warm candlelight, intense red and gold color scheme, romantic and tense atmosphere",
+        "visual_description": "中式婚房，红色绸缎装饰。龙凤烛。大红色床品金线刺绣。烛光。大红色调"
+      },
+      {
+        "name": "陆景琛书房",
+        "description": "书房，深色书架，暗黄灯光，桌上放着文件和一台笔记本电脑",
+        "environment": "室内，夜晚，台灯+顶灯",
+        "time": "夜晚",
+        "weather": "雨",
+        "color_style": "暗黄色调，深棕+暗金，私密紧张感",
+        "fixed_prompt": "Private study room, dark wooden bookshelves, dim yellow desk lamp, documents and laptop on desk, rain outside window, dark brown and muted gold tones, private and tense atmosphere, night scene",
+        "visual_description": "陆景琛书房，深色书架。暗黄灯光。桌上文件和笔记本电脑。窗外下雨。暗黄色调，私密紧张感"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-003",
+    "locations": [
+      {
+        "name": "大学宿舍",
+        "description": "大学女生宿舍，上下铺，桌上堆满泡面和矿泉水，窗外校园",
+        "environment": "室内，白天，日光灯",
+        "time": "白天",
+        "weather": "阴",
+        "color_style": "冷灰色调，杂乱但有生活气息",
+        "fixed_prompt": "University female dormitory, bunk beds, desk piled with instant noodles and water bottles, campus view outside window, overcast daylight, cold gray tones, messy but lived-in feel",
+        "visual_description": "大学女生宿舍，上下铺。桌上堆满泡面和矿泉水。窗外校园。阴天。冷灰色调。杂乱但有生活气息"
+      },
+      {
+        "name": "废品站",
+        "description": "城郊废品站，到处是堆积的金属和旧物，有一间铁皮屋",
+        "environment": "室外+室内，白天，自然光",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "锈色调，铁锈红+灰绿，末世前的废旧感",
+        "fixed_prompt": "Suburban scrapyard, piles of metal scrap and old items, a corrugated iron shack, harsh sunlight, rust-red and gray-green tones, pre-apocalyptic desolate atmosphere",
+        "visual_description": "城郊废品站。堆积的金属和旧物。铁皮屋。强烈阳光。锈色调铁锈红+灰绿。末世前的废旧感"
+      },
+      {
+        "name": "超市",
+        "description": "大型超市内部，货架被搬空，灯光闪烁，地上散落商品",
+        "environment": "室内，夜晚，应急灯闪烁",
+        "time": "夜晚",
+        "weather": "无",
+        "color_style": "冷白色调，暗绿+灰白，末世混乱感",
+        "fixed_prompt": "Interior of a large supermarket, shelves emptied, flickering emergency lights, scattered products on floor, cold white tones, dark green and gray-white, post-apocalyptic chaos, night scene",
+        "visual_description": "大型超市内部。货架被搬空。应急灯闪烁。地上散落商品。冷白色调，暗绿+灰白。末世混乱感"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-004",
+    "locations": [
+      {
+        "name": "古代小镇街道",
+        "description": "青石板路的街道，两旁是木质商铺和摊位，远处有石拱桥",
+        "environment": "室外，白天，阳光明媚",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "暖黄色调，木色+青灰石，古风烟火气",
+        "fixed_prompt": "Ancient Chinese town street, bluestone paving, wooden shops and stalls on both sides, stone arch bridge in distance, bright sunlight, warm yellow tones, wood and gray-stone colors, lively ancient market atmosphere",
+        "visual_description": "古代小镇街道。青石板路。两旁木质商铺和摊位。远处石拱桥。阳光明媚。暖黄色调。古风烟火气"
+      },
+      {
+        "name": "奶茶摊位",
+        "description": "街头小摊，木桌上有陶罐和竹筒，挂着'神仙水'布幌",
+        "environment": "室外，白天，自然光",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "暖棕色调，木色+米白，质朴温暖",
+        "fixed_prompt": "Street stall in ancient town, wooden table with clay pots and bamboo tubes, cloth sign reading '神仙水', warm brown tones, wood and cream-white colors, rustic and warm, daylight",
+        "visual_description": "街头小摊。木桌上有陶罐和竹筒。挂着'神仙水'布幌。暖棕色调，木色+米白。质朴温暖"
+      },
+      {
+        "name": "县衙大堂",
+        "description": "古代县衙，'明镜高悬'匾额，公案桌椅，两侧有衙役站位",
+        "environment": "室内，白天，自然光+灯笼",
+        "time": "白天",
+        "weather": "晴",
+        "color_style": "暗红色调，深红+暗金，庄严肃穆",
+        "fixed_prompt": "Ancient Chinese county office hall, plaque reading '明镜高悬', judicial desk and chair, yamen runners on both sides, dark red tones, deep red and muted gold, solemn atmosphere, daylight and lantern light",
+        "visual_description": "古代县衙大堂。'明镜高悬'匾额。公案桌椅。两侧衙役。暗红色调，深红+暗金。庄严肃穆"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-005",
+    "locations": [
+      {
+        "name": "深渊调查局总部",
+        "description": "地下机构，冷色调走廊，金属门，墙上挂着超自然案件档案",
+        "environment": "室内，夜晚，冷光灯",
+        "time": "夜晚",
+        "weather": "雨",
+        "color_style": "冷蓝色调，钢灰+暗蓝，压抑悬疑感",
+        "fixed_prompt": "Underground agency headquarters, cold-toned corridor, metal doors, supernatural case files on walls, fluorescent lighting, steel-gray and dark blue tones, oppressive mystery atmosphere, night scene",
+        "visual_description": "地下机构走廊。冷色调。金属门。墙上超自然案件档案。冷光灯。钢灰+暗蓝。压抑悬疑感"
+      },
+      {
+        "name": "案发现场·废弃工厂",
+        "description": "废弃工厂车间，生锈机器，地面有粉笔人形标记，警戒线",
+        "environment": "室内，夜晚，手电筒光",
+        "time": "夜晚",
+        "weather": "雨",
+        "color_style": "暗绿色调，铁锈+暗绿，犯罪现场感",
+        "fixed_prompt": "Abandoned factory floor, rusty machines, chalk body outline on floor, yellow police tape, flashlight beam cutting through darkness, rust and dark green tones, crime scene atmosphere, night scene",
+        "visual_description": "废弃工厂车间。生锈机器。地面粉笔人形标记。警戒线。手电筒光。铁锈+暗绿。犯罪现场感"
+      },
+      {
+        "name": "顾寒的家",
+        "description": "单身公寓，墙上贴满案件照片和红线连接，桌上散落旧档案",
+        "environment": "室内，夜晚，台灯",
+        "time": "夜晚",
+        "weather": "雨",
+        "color_style": "暗黄色调，暗棕+暗黄，偏执调查感",
+        "fixed_prompt": "Single apartment, walls covered with case photos connected by red string, old files scattered on desk, single desk lamp, dark brown and dim yellow tones, obsessive investigation atmosphere, night scene, rain outside window",
+        "visual_description": "单身公寓。墙上贴满案件照片和红线连接。桌上散落旧档案。台灯。暗棕+暗黄。偏执调查感"
+      }
+    ]
+  }
+]

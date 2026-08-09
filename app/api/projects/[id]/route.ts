@@ -50,6 +50,7 @@ export async function PATCH(
   if (body.genre !== undefined) updateData.genre = body.genre?.trim() || null;
   if (body.status !== undefined) updateData.status = body.status;
   if (body.cover_url !== undefined) updateData.cover_url = body.cover_url;
+  if (body.style_preset_id !== undefined) updateData.style_preset_id = body.style_preset_id;
 
   const { data, error } = await supabase
     .from("projects")

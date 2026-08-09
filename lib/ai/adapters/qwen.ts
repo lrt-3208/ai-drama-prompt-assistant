@@ -63,7 +63,7 @@ export class QwenProvider implements AIProvider {
   ): Promise<AIResult> {
     const model = config?.model || this.defaultModel;
     const temperature = config?.temperature ?? 0.7;
-    const maxTokens = config?.maxTokens ?? 4096;
+    const maxTokens = config?.maxTokens;
     const jsonMode = config?.jsonMode ?? false;
     const apiKey = config?.apiKey || this.apiKey;
     const baseUrl = config?.apiBase || this.baseUrl;
@@ -80,8 +80,12 @@ export class QwenProvider implements AIProvider {
       model,
       messages,
       temperature,
-      max_tokens: maxTokens,
     };
+
+    // 只在明确设置了 maxTokens 时才发送，否则让 API 使用模型默认最大值
+    if (maxTokens && maxTokens > 0) {
+      body.max_tokens = maxTokens;
+    }
 
     if (jsonMode) {
       body.response_format = { type: "json_object" };

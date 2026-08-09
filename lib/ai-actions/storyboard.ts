@@ -9,7 +9,7 @@ import { createClient } from "@/utils/supabase/server";
 import { AIService } from "@/lib/ai/ai-service";
 import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
-import { getAIConfig } from "@/lib/ai/config";
+import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** DI 上下文（与 assets.ts 一致） */
@@ -183,11 +183,11 @@ export async function generateStoryboard(
   ];
 
   // 5. 调用 AI 生成
-  const aiConfig = await getAIConfig(supabase);
+  const aiConfig = await getUserDefaultAIModel(supabase, userId);
   const storyboard = await AIService.generateJSON<GeneratedStoryboard>(
     messages,
     { userId, projectId, type: GenerationType.STORYBOARD },
-    { maxTokens: 8192, ...aiConfig },
+    { ...aiConfig },
     { supabase }
   );
 
@@ -214,6 +214,7 @@ export async function generateStoryboard(
   }
 
   // 9. 保存到数据库
+  const createdSceneIds: string[] = [];
   for (const ep of storyboard.episodes) {
     // 插入 episode
     const { data: episode, error: epError } = await supabase
@@ -223,6 +224,7 @@ export async function generateStoryboard(
         episode_number: ep.episode_number,
         title: ep.title,
         summary: ep.summary,
+        status: "storyboarded",
       })
       .select("id")
       .single();
@@ -253,31 +255,67 @@ export async function generateStoryboard(
         throw new Error(`创建场景失败: ${scError?.message}`);
       }
 
+      createdSceneIds.push(scene.id);
+
       for (const sh of sc.shots) {
         // 将角色名映射为 ID
         const characterIds = (sh.character_names || [])
           .map((name) => charMap.get(name))
           .filter((id): id is string => !!id);
 
-        // 插入 shot
-        const { error: shError } = await supabase
+        // 插入 shot（不再存 character_ids，改用 shot_characters 关联表）
+        const { data: newShot, error: shError } = await supabase
           .from("shots")
           .insert({
             scene_id: scene.id,
             shot_number: sh.shot_number,
             description: sh.description,
-            character_ids: characterIds,
             action: sh.action || null,
             emotion: sh.emotion || null,
             environment: sh.environment || null,
             cinematography: sh.cinematography || null,
             dialogue: sh.dialogue || null,
-          });
+          })
+          .select("id")
+          .single();
 
-        if (shError) {
-          throw new Error(`创建镜头失败: ${shError.message}`);
+        if (shError || !newShot) {
+          throw new Error(`创建镜头失败: ${shError?.message}`);
+        }
+
+        // 写入 shot_characters 关联表
+        if (characterIds.length > 0) {
+          const scRows = characterIds.map((charId, idx) => ({
+            shot_id: newShot.id,
+            character_id: charId,
+            sort_order: idx,
+          }));
+          const { error: scErr } = await supabase
+            .from("shot_characters")
+            .insert(scRows);
+          if (scErr) {
+            throw new Error(`写入镜头角色关联失败: ${scErr.message}`);
+          }
         }
       }
+    }
+  }
+
+  // 9.5. 为每个 Scene 创建 storyboards 记录（status='draft'）
+  if (createdSceneIds.length > 0) {
+    const sbRows = createdSceneIds.map((sceneId) => ({
+      scene_id: sceneId,
+      project_id: projectId,
+      status: "draft",
+      image_refs: [],
+      is_stale: false,
+      version_number: 1,
+    }));
+    const { error: sbError } = await supabase
+      .from("storyboards")
+      .insert(sbRows);
+    if (sbError) {
+      console.error(`创建 Storyboard 记录失败: ${sbError.message}`);
     }
   }
 
@@ -494,11 +532,11 @@ export async function generateEpisodeStoryboard(
     ];
 
     // 7. AI 生成
-    const aiConfig = await getAIConfig(supabase);
+    const aiConfig = await getUserDefaultAIModel(supabase, userId);
     const episode = await AIService.generateJSON<GeneratedEpisode>(
       messages,
       { userId, projectId, type: GenerationType.STORYBOARD },
-      { maxTokens: 4096, ...aiConfig },
+      { ...aiConfig },
       { supabase }
     );
 
@@ -529,6 +567,8 @@ export async function generateEpisodeStoryboard(
       throw new Error(`更新剧集失败: ${epError.message}`);
     }
 
+    const createdSceneIds: string[] = [];
+
     for (const sc of episode.scenes) {
       const locationId = locMap.get(sc.location_name) || null;
 
@@ -549,26 +589,65 @@ export async function generateEpisodeStoryboard(
         throw new Error(`创建场景失败: ${scError?.message}`);
       }
 
+      createdSceneIds.push(scene.id);
+
       for (const sh of sc.shots) {
         const characterIds = (sh.character_names || [])
           .map((name) => charMap.get(name))
           .filter((id): id is string => !!id);
 
-        const { error: shError } = await supabase.from("shots").insert({
-          scene_id: scene.id,
-          shot_number: sh.shot_number,
-          description: sh.description,
-          character_ids: characterIds,
-          action: sh.action || null,
-          emotion: sh.emotion || null,
-          environment: sh.environment || null,
-          cinematography: sh.cinematography || null,
-          dialogue: sh.dialogue || null,
-        });
+        // 插入 shot（不再存 character_ids，改用 shot_characters 关联表）
+        const { data: newShot, error: shError } = await supabase
+          .from("shots")
+          .insert({
+            scene_id: scene.id,
+            shot_number: sh.shot_number,
+            description: sh.description,
+            action: sh.action || null,
+            emotion: sh.emotion || null,
+            environment: sh.environment || null,
+            cinematography: sh.cinematography || null,
+            dialogue: sh.dialogue || null,
+          })
+          .select("id")
+          .single();
 
-        if (shError) {
-          throw new Error(`创建镜头失败: ${shError.message}`);
+        if (shError || !newShot) {
+          throw new Error(`创建镜头失败: ${shError?.message}`);
         }
+
+        // 写入 shot_characters 关联表
+        if (characterIds.length > 0) {
+          const scRows = characterIds.map((charId, idx) => ({
+            shot_id: newShot.id,
+            character_id: charId,
+            sort_order: idx,
+          }));
+          const { error: scErr } = await supabase
+            .from("shot_characters")
+            .insert(scRows);
+          if (scErr) {
+            throw new Error(`写入镜头角色关联失败: ${scErr.message}`);
+          }
+        }
+      }
+    }
+
+    // 10.5. 为本集所有 Scene 创建 storyboards 记录（status='draft'）
+    if (createdSceneIds.length > 0) {
+      const sbRows = createdSceneIds.map((sceneId) => ({
+        scene_id: sceneId,
+        project_id: projectId,
+        status: "draft",
+        image_refs: [],
+        is_stale: false,
+        version_number: 1,
+      }));
+      const { error: sbError } = await supabase
+        .from("storyboards")
+        .insert(sbRows);
+      if (sbError) {
+        console.error(`创建 Storyboard 记录失败: ${sbError.message}`);
       }
     }
 

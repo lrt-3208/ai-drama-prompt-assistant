@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useTaskPolling, type ActiveTask } from "@/hooks/use-task-polling";
+import { ImageUploader } from "@/components/assets/image-uploader";
 
 interface Character {
   id: string;
@@ -25,6 +26,9 @@ interface Character {
   background: string | null;
   clothing: string | null;
   fixed_prompt: string;
+  portrait_asset_id: string | null;
+  stable_key: string;
+  is_locked: boolean;
 }
 
 const emptyChar: Record<string, string> = {
@@ -37,7 +41,7 @@ function roleVariant(role: string | null) {
   return "secondary" as const;
 }
 
-export function CharacterList({ projectId, initial, activeTask }: { projectId: string; initial: Character[]; activeTask?: ActiveTask | null }) {
+export function CharacterList({ projectId, initial, activeTask, assetUrls = {}, versionMap = {} }: { projectId: string; initial: Character[]; activeTask?: ActiveTask | null; assetUrls?: Record<string, string>; versionMap?: Record<string, number> }) {
   const router = useRouter();
   const [list, setList] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -45,6 +49,9 @@ export function CharacterList({ projectId, initial, activeTask }: { projectId: s
   const [form, setForm] = useState<Record<string, string>>(emptyChar);
   const [loading, setLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [specsOpen, setSpecsOpen] = useState<string | null>(null);
+  const [specsMap, setSpecsMap] = useState<Map<string, Array<{ spec_type: string; spec_name: string; spec_prompt: string }>>>(new Map());
+  const [genSpecsLoading, setGenSpecsLoading] = useState(false);
 
   const { isGenerating, createTask } = useTaskPolling({
     projectId,
@@ -62,6 +69,47 @@ export function CharacterList({ projectId, initial, activeTask }: { projectId: s
     setPrevInitial(initial);
     setList(initial);
   }
+
+  const handleShowSpecs = async (charId: string) => {
+    if (specsOpen === charId) {
+      setSpecsOpen(null);
+      return;
+    }
+    setSpecsOpen(charId);
+    if (!specsMap.has(charId)) {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/characters/${charId}/visual-specs`);
+        if (res.ok) {
+          const data = await res.json();
+          const newMap = new Map(specsMap);
+          newMap.set(charId, data.specs || []);
+          setSpecsMap(newMap);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleGenSpecs = async (charId: string) => {
+    setGenSpecsLoading(true);
+    toast.info("正在生成视觉规范...");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/characters/${charId}/visual-specs`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "生成失败");
+      const newMap = new Map(specsMap);
+      newMap.set(charId, data.specs || []);
+      setSpecsMap(newMap);
+      toast.success("视觉规范生成完成");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "生成失败");
+    } finally {
+      setGenSpecsLoading(false);
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -125,6 +173,20 @@ export function CharacterList({ projectId, initial, activeTask }: { projectId: s
     setOpen(false);
   };
 
+  const handleToggleLock = async (c: Character) => {
+    const res = await fetch(`/api/projects/${projectId}/characters/${c.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_locked: !c.is_locked }),
+    });
+    if (res.ok) {
+      setList(list.map(item => item.id === c.id ? { ...item, is_locked: !c.is_locked } : item));
+      toast.success(c.is_locked ? "已解锁" : "已锁定（AI 重新生成时不会覆盖此角色）");
+    } else {
+      toast.error("操作失败");
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("删除此角色？")) return;
     const res = await fetch(`/api/projects/${projectId}/characters/${id}`, { method: "DELETE" });
@@ -185,16 +247,73 @@ export function CharacterList({ projectId, initial, activeTask }: { projectId: s
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{c.name}</CardTitle>
-                  {c.role && <Badge variant={roleVariant(c.role)}>{c.role}</Badge>}
+                  <div className="flex items-center gap-1">
+                    {c.is_locked && <Badge variant="outline" className="text-xs">🔒 已锁定</Badge>}
+                    {c.role && <Badge variant={roleVariant(c.role)}>{c.role}</Badge>}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
+                <div className="mb-3" onClick={e => e.stopPropagation()}>
+                  <ImageUploader
+                    projectId={projectId}
+                    entityType="character"
+                    entityId={c.id}
+                    assetType="character_portrait"
+                    assetId={c.portrait_asset_id}
+                    url={c.portrait_asset_id ? assetUrls[c.portrait_asset_id] : null}
+                    hint="上传角色定妆照"
+                    onUploaded={(assetId) => setList(list.map(item => item.id === c.id ? { ...item, portrait_asset_id: assetId } : item))}
+                    onDeleted={() => setList(list.map(item => item.id === c.id ? { ...item, portrait_asset_id: null } : item))}
+                  />
+                </div>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-xs text-muted-foreground font-mono">{c.stable_key}</p>
+                  {versionMap[c.id] && <Badge variant="outline" className="text-[10px] h-4 px-1">v{versionMap[c.id]}</Badge>}
+                </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{c.fixed_prompt}</p>
                 <div className="flex gap-2 flex-wrap">
                   {c.gender && <span className="text-xs text-muted-foreground">{c.gender}</span>}
                   {c.age && <span className="text-xs text-muted-foreground">{c.age}岁</span>}
                 </div>
-                <Button variant="ghost" size="sm" className="text-destructive mt-2" onClick={e => { e.stopPropagation(); handleDelete(c.id); }}>删除</Button>
+                <div className="flex gap-2 mt-2">
+                  <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); handleToggleLock(c); }}>
+                    {c.is_locked ? "🔓 解锁" : "🔒 锁定"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); handleShowSpecs(c.id); }}>
+                    {specsOpen === c.id ? "收起规范" : "视觉规范"}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive" onClick={e => { e.stopPropagation(); handleDelete(c.id); }}>删除</Button>
+                </div>
+
+                {/* 视觉规范展示 */}
+                {specsOpen === c.id && (
+                  <div className="mt-3 rounded-lg bg-muted/30 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">视觉规范（4 类）</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={genSpecsLoading}
+                        onClick={e => { e.stopPropagation(); handleGenSpecs(c.id); }}
+                      >
+                        {genSpecsLoading ? "生成中..." : "AI 生成"}
+                      </Button>
+                    </div>
+                    {(specsMap.get(c.id) || []).length > 0 ? (
+                      <div className="space-y-2">
+                        {(specsMap.get(c.id) || []).map((spec, i) => (
+                          <div key={i} className="text-xs">
+                            <Badge variant="outline" className="mb-1">{spec.spec_name}</Badge>
+                            <p className="text-muted-foreground font-mono">{spec.spec_prompt}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">尚未生成视觉规范，点击 &ldquo;AI 生成&rdquo;</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

@@ -75,6 +75,7 @@ export function startHeartbeat(
 
 /**
  * 标记任务最终状态
+ * 如果任务已被 force-reset（status="failed"），不覆盖
  * @param ok 是否成功
  * @param errorMsg 失败时的错误信息
  */
@@ -84,6 +85,18 @@ export async function finalizeTask(
   ok: boolean,
   errorMsg?: string
 ): Promise<void> {
+  // 检查任务是否被用户 force-reset
+  const { data: current } = await supabase
+    .from("project_tasks")
+    .select("status")
+    .eq("id", taskId)
+    .single();
+
+  if (current?.status === "failed") {
+    // 任务已被 force-reset，不覆盖状态
+    return;
+  }
+
   await supabase
     .from("project_tasks")
     .update({

@@ -17,8 +17,17 @@ import {
   generateEpisodeStoryboard,
   type AIActionContext as StoryboardActionContext,
 } from "@/lib/ai-actions/storyboard";
-import { generateImagePrompt, generateVideoPrompt } from "@/lib/prompt-engine/prompt-generator";
+import {
+  generateStoryboardAsset,
+  type AIActionContext as StoryboardAssetActionContext,
+} from "@/lib/ai-actions/storyboard-asset";
+import { generateImagePrompt } from "@/lib/prompt-engine/prompt-generator";
+import { generateSceneVideoPrompt } from "@/lib/prompt-engine/scene-video-prompt-generator";
+import { evaluatePromptQuality } from "@/lib/prompt-engine/prompt-evaluator";
 import type { PromptEngineContext } from "@/lib/prompt-engine/context-builder";
+import { runImpact, type ImpactPayload } from "@/lib/lifecycle/impact-engine";
+import { runIncrementalRegen } from "@/lib/lifecycle/incremental-regen";
+import { getUserDefaultAIModel } from "@/lib/ai/config";
 import { lockTask, startHeartbeat, finalizeTask } from "./task-utils";
 
 /**
@@ -42,7 +51,19 @@ export async function executeGenerationTask(
     return;
   }
 
-  const ctx: AIActionContext & StoryboardActionContext & PromptEngineContext = { supabase };
+  // model_snapshot — 记录任务使用的 AI 模型快照（业务层直接 update，无 RPC）
+  const modelConfig = await getUserDefaultAIModel(supabase, task.user_id, "text");
+  await supabase.from("project_tasks").update({
+    payload: {
+      ...task.payload,
+      model_snapshot: {
+        provider: modelConfig.provider,
+        model: modelConfig.model,
+      },
+    },
+  }).eq("id", taskId);
+
+  const ctx: AIActionContext & StoryboardActionContext & StoryboardAssetActionContext & PromptEngineContext = { supabase };
   const payload = task.payload || {};
   let ok = false;
   let errorMsg: string | undefined;
@@ -101,25 +122,57 @@ export async function executeGenerationTask(
         break;
 
       case "generate_prompt":
-        if (payload.promptType === "image") {
-          await generateImagePrompt(
-            payload.shotId as string,
-            task.project_id,
-            task.user_id,
-            payload.platform as string,
-            (payload.language as "zh" | "en") || "zh",
-            ctx
-          );
-        } else {
-          await generateVideoPrompt(
-            payload.shotId as string,
-            task.project_id,
-            task.user_id,
-            payload.platform as string,
-            (payload.language as "zh" | "en") || "zh",
-            ctx
-          );
-        }
+        await generateImagePrompt(
+          payload.shotId as string,
+          task.project_id,
+          task.user_id,
+          payload.platform as string,
+          (payload.language as "zh" | "en") || "zh",
+          ctx
+        );
+        break;
+
+      case "generate_storyboard_asset":
+        await generateStoryboardAsset(
+          payload.sceneId as string,
+          task.project_id,
+          task.user_id,
+          ctx
+        );
+        break;
+
+      case "generate_scene_video_prompt":
+        await generateSceneVideoPrompt(
+          payload.sceneId as string,
+          task.project_id,
+          task.user_id,
+          (payload.platform as string) || "jimeng",
+          (payload.language as "zh" | "en") || "zh",
+          ctx
+        );
+        break;
+
+      case "run_impact":
+        await runImpact(
+          payload as unknown as ImpactPayload,
+          ctx
+        );
+        break;
+
+      case "run_regen":
+        await runIncrementalRegen(
+          task.project_id,
+          task.user_id,
+          ctx
+        );
+        break;
+
+      case "evaluate_prompt":
+        await evaluatePromptQuality(
+          payload.promptId as string,
+          task.user_id,
+          ctx
+        );
         break;
 
       default:

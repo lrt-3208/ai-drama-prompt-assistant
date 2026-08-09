@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { executeInitializeTask } from "@/lib/tasks/initialize-assets";
+import { hasDefaultAIModel } from "@/lib/ai/config";
 
 // Vercel: after() 执行 AI 任务需要足够的运行时间
 export const maxDuration = 60;
@@ -43,16 +44,11 @@ export async function POST(
     return NextResponse.json({ error: "项目不存在" }, { status: 404 });
   }
 
-  // 2. 验证 AI 配置
-  const { data: aiConfig } = await supabase
-    .from("ai_config")
-    .select("api_key, api_base")
-    .eq("id", 1)
-    .maybeSingle();
-
-  if (!aiConfig?.api_key || !aiConfig?.api_base) {
+  // 2. 验证 AI 配置（检查用户默认模型）
+  const hasModel = await hasDefaultAIModel(supabase, user.id, "text");
+  if (!hasModel) {
     return NextResponse.json(
-      { error: "AI 模型未配置，请先到设置页面填写 API 地址和 API Key" },
+      { error: "AI 模型未配置，请先到「AI 模型管理」页面配置默认文本模型" },
       { status: 400 }
     );
   }
@@ -62,22 +58,39 @@ export async function POST(
 
   // reset：标记活跃任务为 failed
   if (body.action === "reset") {
-    await supabase
+    // 先查询活跃任务数量
+    const { count: activeCount } = await supabase
       .from("project_tasks")
-      .update({
-        status: "failed",
-        error: { reason: "user_reset" },
-        completed_at: new Date().toISOString(),
-      })
+      .select("id", { count: "exact", head: true })
       .eq("project_id", id)
       .in("status", ["pending", "running"]);
 
-    await supabase
-      .from("projects")
-      .update({ asset_status: "failed" })
-      .eq("id", id);
+    // 标记活跃任务为 failed
+    if (activeCount && activeCount > 0) {
+      await supabase
+        .from("project_tasks")
+        .update({
+          status: "failed",
+          error: { reason: "user_reset" },
+          completed_at: new Date().toISOString(),
+        })
+        .eq("project_id", id)
+        .in("status", ["pending", "running"]);
 
-    return NextResponse.json({ data: { message: "已重置" } });
+      // 只在有活跃任务被重置时才更新 asset_status
+      // 设为 pending 让用户可以重新初始化，而不是 failed
+      await supabase
+        .from("projects")
+        .update({ asset_status: "pending" })
+        .eq("id", id);
+    }
+
+    return NextResponse.json({
+      data: {
+        message: activeCount && activeCount > 0 ? "已重置，可以重新初始化" : "没有需要重置的活跃任务",
+        resetCount: activeCount || 0,
+      },
+    });
   }
 
   // 4. INSERT project_tasks（唯一索引防重复）

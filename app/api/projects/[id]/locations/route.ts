@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { generateStableKey } from "@/lib/ai-actions/assets";
 
 export async function GET(
   _request: NextRequest,
@@ -50,6 +51,7 @@ export async function POST(
       weather: body.weather?.trim() || null,
       color_style: body.color_style?.trim() || null,
       fixed_prompt: body.fixed_prompt.trim(),
+      stable_key: generateStableKey("location"),
     })
     .select("*")
     .single();

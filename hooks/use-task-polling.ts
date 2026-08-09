@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 
 export interface ActiveTask {
   id: string;
@@ -17,6 +18,8 @@ interface UseTaskPollingOptions {
 
 const TERMINAL_STATUSES = ["success", "partial", "failed"];
 const ACTIVE_STATUSES = ["pending", "running"];
+/** 最大轮询时间 5 分钟，超时后停止并提示用户 */
+const MAX_POLL_DURATION = 5 * 60 * 1000;
 
 /**
  * 共享任务轮询 hook（单任务模式）
@@ -72,6 +75,14 @@ export function useTaskPolling({
 
     const tick = async () => {
       if (cancelled) return;
+
+      // 超时检查
+      if (Date.now() - startTime > MAX_POLL_DURATION) {
+        setTaskStatus("failed");
+        toast.error("任务执行超时（5 分钟），请刷新页面重试或检查 AI 模型配置");
+        onDoneRef.current?.("timeout", {});
+        return;
+      }
 
       try {
         const res = await fetch(`/api/tasks/${taskId}`);

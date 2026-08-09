@@ -10,6 +10,7 @@ import {
   generateStyle,
   type AIActionContext,
 } from "@/lib/ai-actions/assets";
+import { getUserDefaultAIModel } from "@/lib/ai/config";
 import {
   lockTask,
   updateProgress,
@@ -39,6 +40,18 @@ export async function executeInitializeTask(
     // 已被其他 runner 锁定或不存在
     return;
   }
+
+  // model_snapshot — 记录任务使用的 AI 模型快照（业务层直接 update，无 RPC）
+  const modelConfig = await getUserDefaultAIModel(supabase, task.user_id, "text");
+  await supabase.from("project_tasks").update({
+    payload: {
+      ...task.payload,
+      model_snapshot: {
+        provider: modelConfig.provider,
+        model: modelConfig.model,
+      },
+    },
+  }).eq("id", taskId);
 
   const ctx: AIActionContext = { supabase };
   const results: Record<string, { ok: boolean; error?: string }> = {
@@ -104,6 +117,19 @@ export async function executeInitializeTask(
     }
   } finally {
     stopHeartbeat();
+  }
+
+  // 检查任务是否被用户 force-reset（status 被外部改为 "failed"）
+  // 如果被 force-reset，不再覆盖任务状态和项目状态
+  const { data: currentTask } = await supabase
+    .from("project_tasks")
+    .select("status")
+    .eq("id", taskId)
+    .single();
+
+  if (currentTask?.status === "failed") {
+    // 任务已被 force-reset，不覆盖状态
+    return;
   }
 
   // 4. 最终状态

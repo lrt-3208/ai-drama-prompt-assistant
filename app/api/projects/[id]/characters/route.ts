@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { sanitizeAge, generateStableKey } from "@/lib/ai-actions/assets";
 
 export async function GET(
   _request: NextRequest,
@@ -45,13 +46,14 @@ export async function POST(
       project_id: id,
       name: body.name.trim(),
       role: body.role?.trim() || null,
-      age: body.age || null,
+      age: sanitizeAge(body.age),
       gender: body.gender || null,
       appearance: body.appearance?.trim() || null,
       personality: body.personality?.trim() || null,
       background: body.background?.trim() || null,
       clothing: body.clothing?.trim() || null,
       fixed_prompt: body.fixed_prompt.trim(),
+      stable_key: generateStableKey("char"),
     })
     .select("*")
     .single();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
-import { generateImagePrompt, generateVideoPrompt } from "@/lib/prompt-engine/prompt-generator";
+import { generateImagePrompt } from "@/lib/prompt-engine/prompt-generator";
 
 export async function POST(
   request: NextRequest,
@@ -39,35 +39,24 @@ export async function POST(
     );
   }
 
-  if (!["image", "video"].includes(promptType)) {
+  if (promptType !== "image") {
     return NextResponse.json(
-      { error: "promptType 必须是 image 或 video" },
+      { error: "promptType 必须是 image" },
       { status: 400 }
     );
   }
 
   try {
-    const result =
-      promptType === "image"
-        ? await generateImagePrompt(
-            shotId,
-            id,
-            user.id,
-            platform,
-            (language as "zh" | "en") || "zh"
-          )
-        : await generateVideoPrompt(
-            shotId,
-            id,
-            user.id,
-            platform,
-            (language as "zh" | "en") || "zh"
-          );
+    const result = await generateImagePrompt(
+      shotId,
+      id,
+      user.id,
+      platform,
+      (language as "zh" | "en") || "zh"
+    );
     return NextResponse.json({ data: result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Prompt 生成失败";
-    // 视频依赖检查失败返回 400
-    const status = message.includes("请先生成") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

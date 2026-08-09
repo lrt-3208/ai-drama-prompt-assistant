@@ -1,38 +1,72 @@
 // ============================================
-// AI 配置加载 — 从 ai_config 表读取，DB 为唯一配置源
+// AI 配置加载 — 从 user_ai_models 表读取用户默认模型
+// 实时读取，不缓存；每个用户按 modality 独立配置
 // ============================================
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AIRequestConfig } from "./types";
 
-async function getDefaultClient(): Promise<SupabaseClient> {
-  const { cookies } = await import("next/headers");
-  const cookieStore = await cookies();
-  const { createClient } = await import("@/utils/supabase/server");
-  return createClient(cookieStore);
-}
+/** 模型类型 */
+export type ModelModality = "text" | "image" | "video";
 
 /**
- * 从数据库读取 AI 配置（provider/model/temperature/api_base/api_key）
- * DB 为唯一配置源，所有字段直接返回给调用方
+ * 从 user_ai_models 表读取用户默认模型配置
+ * 每次调用实时查询数据库，不缓存
+ *
+ * @param supabase Supabase 客户端
+ * @param userId 用户 ID
+ * @param modality 模型类型（text/image/video），默认 text
+ * @returns Partial<AIRequestConfig> — 空对象表示未配置
  */
-export async function getAIConfig(
-  supabase?: SupabaseClient
+export async function getUserDefaultAIModel(
+  supabase: SupabaseClient,
+  userId: string,
+  modality: ModelModality = "text"
 ): Promise<Partial<AIRequestConfig>> {
-  const client = supabase ?? (await getDefaultClient());
-  const { data } = await client
-    .from("ai_config")
-    .select("model, temperature, max_tokens, api_base, api_key")
-    .eq("id", 1)
+  const { data } = await supabase
+    .from("user_ai_models")
+    .select(
+      "provider, model, api_base, api_key, temperature, max_tokens, modality"
+    )
+    .eq("user_id", userId)
+    .eq("modality", modality)
+    .eq("is_default", true)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (!data) return {};
 
-  return {
+  const config: Partial<AIRequestConfig> = {
+    provider: data.provider || undefined,
     model: data.model || undefined,
-    temperature: data.temperature ?? undefined,
-    maxTokens: data.max_tokens ?? undefined,
     apiKey: data.api_key || undefined,
     apiBase: data.api_base || undefined,
+    temperature: data.temperature ?? undefined,
   };
+  // 只在用户实际填写了 max_tokens 时才包含该键
+  // 避免 spread 覆盖 action 文件中的 per-task 默认值
+  if (data.max_tokens != null && data.max_tokens > 0) {
+    config.maxTokens = data.max_tokens;
+  }
+  return config;
+}
+
+/**
+ * 检查用户是否有指定 modality 的默认模型
+ * 用于创建项目时的验证
+ */
+export async function hasDefaultAIModel(
+  supabase: SupabaseClient,
+  userId: string,
+  modality: ModelModality = "text"
+): Promise<boolean> {
+  const { count } = await supabase
+    .from("user_ai_models")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("modality", modality)
+    .eq("is_default", true)
+    .eq("is_active", true);
+
+  return (count ?? 0) > 0;
 }

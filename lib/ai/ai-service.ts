@@ -2,8 +2,6 @@
 // AI 服务层 - AIService 统一入口
 // ============================================
 
-import type { AIProvider } from "./provider";
-import { QwenProvider } from "./adapters/qwen";
 import type {
   AIRequestConfig,
   AIResult,
@@ -13,16 +11,7 @@ import type {
 import { AIError, AIErrorType, GenerationType } from "./types";
 import { withRetry, toAIError } from "./error-handler";
 import { logAISuccess, logAIFailure, type LoggerContext } from "./logger";
-
-// Provider 单例（惰性初始化）
-let providerInstance: AIProvider | null = null;
-
-function getProvider(): AIProvider {
-  if (!providerInstance) {
-    providerInstance = new QwenProvider();
-  }
-  return providerInstance;
-}
+import { getProvider } from "./adapters/factory";
 
 // 非 Prompt 类型注入中文指令（Prompt 类型由模板 output_language 控制）
 const ZH_SUFFIX =
@@ -47,7 +36,7 @@ export const AIService = {
     context: AICallContext,
     client?: LoggerContext
   ): Promise<AIResult> {
-    const provider = getProvider();
+    const provider = getProvider(config.provider);
     const model = config.model || "qwen3.7-max";
 
     // 非 Prompt 类型注入中文（script/storyboard/character）
@@ -55,7 +44,7 @@ export const AIService = {
     let processedMessages = messages;
     if (
       context.type !== GenerationType.IMAGE_PROMPT &&
-      context.type !== GenerationType.VIDEO_PROMPT &&
+      context.type !== GenerationType.SCENE_VIDEO_PROMPT &&
       context.type !== GenerationType.CHAT
     ) {
       processedMessages = messages.map((m) =>
@@ -142,6 +131,6 @@ export const AIService = {
 
   /** Provider 名称 */
   get providerName(): string {
-    return getProvider().name;
+    return getProvider().name; // 默认 provider（qwen）
   },
 };

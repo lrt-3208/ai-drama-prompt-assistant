@@ -89,9 +89,11 @@ export function ScriptView({
     <div className="max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold mb-1">剧本</h2>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-lg font-semibold">剧本</h2>
+          </div>
           <p className="text-sm text-muted-foreground">
-            基于故事输入，AI 自动生成结构化剧本。
+            基于故事输入，AI 自动生成结构化剧本。每次重新生成会覆盖当前剧本。
           </p>
         </div>
         <Button onClick={handleGenerate} disabled={isGenerating} variant="outline">

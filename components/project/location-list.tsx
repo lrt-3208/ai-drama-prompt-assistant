@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useTaskPolling, type ActiveTask } from "@/hooks/use-task-polling";
+import { ImageUploader } from "@/components/assets/image-uploader";
 
 interface Location {
   id: string;
@@ -20,11 +21,12 @@ interface Location {
   weather: string | null;
   color_style: string | null;
   fixed_prompt: string;
+  reference_asset_id: string | null;
 }
 
 const emptyLoc: Record<string, string> = { name: "", description: "", environment: "", time: "", weather: "", color_style: "", fixed_prompt: "" };
 
-export function LocationList({ projectId, initial, activeTask }: { projectId: string; initial: Location[]; activeTask?: ActiveTask | null }) {
+export function LocationList({ projectId, initial, activeTask, assetUrls = {} }: { projectId: string; initial: Location[]; activeTask?: ActiveTask | null; assetUrls?: Record<string, string> }) {
   const router = useRouter();
   const [list, setList] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -138,6 +140,19 @@ export function LocationList({ projectId, initial, activeTask }: { projectId: st
             <Card key={l.id} className="cursor-pointer hover:bg-accent/50" onClick={() => openEdit(l)}>
               <CardHeader><CardTitle className="text-base">{l.name}</CardTitle></CardHeader>
               <CardContent>
+                <div className="mb-3" onClick={e => e.stopPropagation()}>
+                  <ImageUploader
+                    projectId={projectId}
+                    entityType="location"
+                    entityId={l.id}
+                    assetType="location_reference"
+                    assetId={l.reference_asset_id}
+                    url={l.reference_asset_id ? assetUrls[l.reference_asset_id] : null}
+                    hint="上传场景参考图"
+                    onUploaded={(assetId) => setList(list.map(item => item.id === l.id ? { ...item, reference_asset_id: assetId } : item))}
+                    onDeleted={() => setList(list.map(item => item.id === l.id ? { ...item, reference_asset_id: null } : item))}
+                  />
+                </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{l.fixed_prompt}</p>
                 <div className="flex gap-2 flex-wrap">
                   {l.time && <span className="text-xs text-muted-foreground">{l.time}</span>}

@@ -1,0 +1,47 @@
+[
+  {
+    "projectId": "proj-001",
+    "name": "都市修仙暗黑风",
+    "camera_style": "手持摄影+低角度仰拍，强调主角的压迫感和力量感。动作场景用快速剪辑",
+    "color": "主色调深蓝灰+暖黄，暗部偏冷蓝，高光偏暖黄。对比度强",
+    "lighting": "低调照明，伦勃朗光。室内暗调+窗外强光反差。夜戏用城市霓虹光",
+    "cinematography": "广角+浅景深，主体清晰背景虚化。动作场景用跟随镜头。关键反转用 Dutch angle",
+    "fixed_prompt": "Dark urban cultivation style, desaturated blue-gray with warm yellow highlights, low-key Rembrandt lighting, handheld low-angle shots, shallow depth of field, neon-lit night scenes, high contrast, dramatic mood"
+  },
+  {
+    "projectId": "proj-002",
+    "name": "豪门奢华质感",
+    "camera_style": "稳定器+轨道推拉，缓慢优雅的运镜。对称构图强调仪式感",
+    "color": "主色调深红+金色+米白，暗金质感。暖色调为主，冷调点缀",
+    "lighting": "柔和面光+水晶吊灯漫射。夜戏用烛光和暖色台灯。明暗过渡柔和",
+    "cinematography": "中焦+大光圈，人物特写质感细腻。对称构图。转场用缓慢叠化",
+    "fixed_prompt": "Luxurious mansion drama style, deep red and gold with cream tones, soft diffused lighting with crystal chandelier, stabilizer and dolly shots, symmetrical composition, medium telephoto with large aperture, elegant and slow pacing, warm color palette"
+  },
+  {
+    "projectId": "proj-003",
+    "name": "末日冷峻纪实",
+    "camera_style": "手持+肩扛摄影，纪录片质感。快速变焦和不规则构图",
+    "color": "主色调冷青绿+灰白，极度去色。仅保留火光和应急灯的暖色",
+    "lighting": "自然光为主，室内用应急灯和手电筒。强烈明暗对比",
+    "cinematography": "广角畸变+高ISO噪点质感。手持晃动增加紧张感。特写用浅景深",
+    "fixed_prompt": "Post-apocalyptic documentary style, cold cyan-green and gray-white desaturated palette, handheld shoulder-mounted camera, fast zoom and irregular framing, natural light with emergency lamp and flashlight, high ISO grain, shallow depth of field close-ups, intense and raw"
+  },
+  {
+    "projectId": "proj-004",
+    "name": "古风治愈暖调",
+    "camera_style": "固定机位+缓慢摇移，画面平稳。多用中远景展现环境",
+    "color": "主色调暖黄+木色+青灰，饱和度适中。阳光感强烈",
+    "lighting": "自然日光+暖色补光。室外逆光和侧光。整体明亮通透",
+    "cinematography": "标准焦段+大景深，前景中景背景都清晰。构图讲究留白和对称",
+    "fixed_prompt": "Ancient Chinese healing style, warm yellow and wood tones with gray stone accents, moderate saturation, strong sunlight feel, natural daylight with warm fill light, standard focal length with deep depth of field, stable camera with slow pans, balanced composition with negative space"
+  },
+  {
+    "projectId": "proj-005",
+    "name": "悬疑暗调冷峻",
+    "camera_style": "固定+缓慢推拉，压抑感强。大量主观镜头和过肩镜头",
+    "color": "主色调冷蓝+暗黄+灰，极低饱和度。雨夜青蓝色调",
+    "lighting": "低调照明+硬光。台灯单点光源+窗外冷光。阴影面积大",
+    "cinematography": "长焦+浅景深，空间压缩感。Dutch angle 和镜像反射构图",
+    "fixed_prompt": "Dark suspense thriller style, cold blue and dim yellow with gray, extremely low saturation, blue rain night tones, low-key lighting with hard light, single desk lamp source with cold window light, long telephoto with shallow depth of field, Dutch angles and mirror reflection compositions, oppressive atmosphere"
+  }
+]

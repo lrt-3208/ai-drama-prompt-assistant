@@ -29,6 +29,12 @@ export function DashboardNav({ userEmail, nickname }: DashboardNavProps) {
           <Link href="/dashboard" className="text-lg font-bold">
             AI 短剧 Prompt 助手
           </Link>
+          <Link
+            href="/settings/ai-models"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            AI 模型
+          </Link>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">{nickname} · {userEmail}</span>

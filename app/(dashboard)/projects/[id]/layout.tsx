@@ -14,7 +14,10 @@ export default async function ProjectLayout({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // 使用 getUser() 远程验证用户身份（Supabase 安全推荐）
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: project, error } = await supabase

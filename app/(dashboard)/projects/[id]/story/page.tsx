@@ -12,29 +12,30 @@ export default async function StoryPage({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 查询 project（含 asset_status + asset_error + asset_progress）
-  const { data: project } = await supabase
-    .from("projects")
-    .select("asset_status, asset_error, asset_progress")
-    .eq("id", id)
-    .single();
-
-  // 查询最新活跃任务（pending / running）
-  const { data: activeTask } = await supabase
-    .from("project_tasks")
-    .select("id, status, progress, error, task_type")
-    .eq("project_id", id)
-    .in("status", ["pending", "running"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // 查询 story
-  const { data: story } = await supabase
-    .from("stories")
-    .select("*")
-    .eq("project_id", id)
-    .single();
+  // 3 个独立查询并行执行
+  const [projectRes, activeTaskRes, storyRes] = await Promise.all([
+    supabase
+      .from("projects")
+      .select("asset_status, asset_error, asset_progress")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("project_tasks")
+      .select("id, status, progress, error, task_type")
+      .eq("project_id", id)
+      .in("status", ["pending", "running"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("stories")
+      .select("*")
+      .eq("project_id", id)
+      .single(),
+  ]);
+  const project = projectRes.data;
+  const activeTask = activeTaskRes.data;
+  const story = storyRes.data;
 
   const assetStatus = project?.asset_status ?? "draft";
 

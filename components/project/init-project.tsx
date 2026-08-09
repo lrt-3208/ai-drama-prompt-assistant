@@ -83,16 +83,19 @@ export function InitProject({
   );
   const [resetting, setResetting] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initCalledRef = useRef(false);
 
   // auto 模式：创建任务
   useEffect(() => {
-    if (mode === "auto" && !taskId) {
+    if (mode === "auto" && !taskId && !initCalledRef.current) {
+      initCalledRef.current = true;
       fetch(`/api/projects/${projectId}/initialize`, { method: "POST" })
         .then((res) => res.json())
         .then((data) => {
           if (data.taskId) {
             setTaskId(data.taskId);
-            setTaskStatus("pending");
+            setTaskStatus(data.status || "pending");
+            if (data.progress) setProgress(data.progress);
           } else if (data.error && data.status !== 409) {
             toast.error(data.error);
           } else if (data.taskId === null && data.assetStatus === "initialized") {
@@ -118,12 +121,24 @@ export function InitProject({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, taskId, taskStatus, projectId]);
 
-  // 轮询（3s 固定间隔）
+  // 轮询（3s 固定间隔，最大 5 分钟超时）
   useEffect(() => {
     if (!taskId) return;
     if (!["pending", "waking_up", "running"].includes(taskStatus || "")) return;
 
+    const startTime = Date.now();
+    const MAX_DURATION = 5 * 60 * 1000; // 5 分钟
+
     const interval = setInterval(async () => {
+      // 超时检查
+      if (Date.now() - startTime > MAX_DURATION) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setTaskStatus("failed");
+        toast.error("初始化超时（5 分钟），请刷新重试或检查 AI 模型配置");
+        setTimeout(() => router.refresh(), 800);
+        return;
+      }
+
       try {
         const res = await fetch(`/api/tasks/${taskId}`);
         const data = await res.json();

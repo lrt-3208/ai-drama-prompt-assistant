@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
+import { hasDefaultAIModel } from "@/lib/ai/config";
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -38,6 +39,15 @@ export async function POST(request: NextRequest) {
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "项目名称不能为空" }, { status: 400 });
+  }
+
+  // 检查用户是否已配置默认文本模型
+  const hasModel = await hasDefaultAIModel(supabase, user.id, "text");
+  if (!hasModel) {
+    return NextResponse.json(
+      { error: "请先到「AI 模型管理」页面配置默认文本模型" },
+      { status: 400 }
+    );
   }
 
   const { data, error } = await supabase

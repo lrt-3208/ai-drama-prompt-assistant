@@ -4,10 +4,8 @@ import { createClient } from "@/utils/supabase/middleware";
 export async function middleware(request: NextRequest) {
   const { supabase, supabaseResponse } = createClient(request);
 
-  // Refresh session
-  await supabase.auth.getUser();
-
-  // Protected routes - redirect to login if not authenticated
+  // 刷新 session + 获取用户（一次调用同时完成两件事）
+  // getUser() 会刷新 cookie 中的 session 并返回用户
   const { data: { user } } = await supabase.auth.getUser();
   if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));

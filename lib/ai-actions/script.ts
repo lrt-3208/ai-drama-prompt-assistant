@@ -8,7 +8,7 @@ import { createClient } from "@/utils/supabase/server";
 import { AIService } from "@/lib/ai/ai-service";
 import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
-import { getAIConfig } from "@/lib/ai/config";
+import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** DI 上下文（与 assets.ts 一致） */
@@ -152,15 +152,15 @@ export async function generateScript(
   ];
 
   // 5. 调用 AI 生成
-  const aiConfig = await getAIConfig(supabase);
+  const aiConfig = await getUserDefaultAIModel(supabase, userId);
   const script = await AIService.generateJSON<GeneratedScript>(
     messages,
     { userId, projectId, type: GenerationType.SCRIPT },
-    { maxTokens: 4096, ...aiConfig },
+    { ...aiConfig },
     { supabase }
   );
 
-  // 6. 保存到 scripts 表（upsert by project_id）
+  // 6. 保存到 scripts 表（upsert by project_id）— 保留用于快速查询
   const { data: saved, error: saveError } = await supabase
     .from("scripts")
     .upsert({

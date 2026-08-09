@@ -1,0 +1,170 @@
+[
+  {
+    "projectId": "proj-001",
+    "characters": [
+      {
+        "name": "林逸",
+        "age": 28,
+        "gender": "男",
+        "appearance": "面容清秀但眼神深邃，平时戴黑框眼镜掩饰锐利目光，穿简单卫衣牛仔裤，看似普通上班族",
+        "personality": "表面温和谦逊，内心果断冷厉。对敌人毫不留情，对身边人极重情义。习惯隐藏实力，厌恶炫耀",
+        "background": "原为互联网公司底层程序员，被排挤后意外穿越到修仙界，修炼千年归来。拥有远超常人的精神力和武技",
+        "clothing": "都市休闲风：黑色卫衣、深色牛仔裤、白色运动鞋。偶尔穿一件灰色风衣",
+        "fixed_prompt": "A young Chinese man, 28 years old, clean-cut face with deep piercing eyes hidden behind black-framed glasses, wearing a black hoodie and dark jeans, casual urban style, subtle aura of hidden power, modern city background",
+        "visual_description": "28岁中国青年男性，面容清秀，眼神深邃有神，戴黑框眼镜。身穿黑色连帽卫衣和深色牛仔裤，白色运动鞋。气质内敛但偶尔流露出不属于普通人的锐利"
+      },
+      {
+        "name": "苏晴",
+        "age": 26,
+        "gender": "女",
+        "appearance": "长发微卷，五官精致，职场精英打扮，常穿白色衬衫配高腰裙",
+        "personality": "干练果断，有野心但讲原则。曾经看不起林逸，重逢后被打动",
+        "background": "前女友，现为公司部门经理。当年林逸被排挤时选择离开他",
+        "clothing": "职场精英风：白色丝质衬衫、黑色高腰铅笔裙、裸色高跟鞋",
+        "fixed_prompt": "A young Chinese woman, 26 years old, long wavy hair, delicate features, wearing a white silk blouse and black high-waisted pencil skirt, professional businesswoman look, confident expression, modern office background",
+        "visual_description": "26岁中国青年女性，长发微卷，五官精致。白色丝质衬衫搭配黑色高腰裙，裸色高跟鞋。气质干练自信"
+      },
+      {
+        "name": "赵天豪",
+        "age": 35,
+        "gender": "男",
+        "appearance": "身材魁梧，面相凶狠，穿黑色西装，戴金表",
+        "personality": "嚣张跋扈，欺软怕硬。当年排挤林逸的主力，如今恐惧林逸回归",
+        "background": "公司副总，当年靠手段上位。背后有修仙界势力支持",
+        "clothing": "黑色定制西装，金色领带夹，劳力士金表",
+        "fixed_prompt": "A Chinese man, 35 years old, burly build, fierce face, wearing a black tailored suit with gold tie clip and gold Rolex watch, arrogant expression, luxurious office background",
+        "visual_description": "35岁中国男性，身材魁梧，面相凶狠。黑色定制西装，金色配饰。气质嚣张跋扈"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-002",
+    "characters": [
+      {
+        "name": "苏婉宁",
+        "age": 24,
+        "gender": "女",
+        "appearance": "面容温婉清秀，长发如瀑，穿素雅长裙，眉眼间带着倔强",
+        "personality": "外柔内刚，聪慧隐忍。被迫替嫁但不甘命运摆布，善于观察和隐忍",
+        "background": "苏家旁系千金，自幼丧母，被大房收养。因家族利益被迫替嫁陆家",
+        "clothing": "素雅旗袍或长裙，珍珠耳饰，低调但质感上乘",
+        "fixed_prompt": "A young Chinese woman, 24 years old, gentle and refined features, long flowing black hair, wearing an elegant light-colored qipao with pearl earrings, determined eyes, luxurious mansion interior background",
+        "visual_description": "24岁中国青年女性，面容温婉清秀，长发如瀑。穿素雅浅色旗袍，珍珠耳饰。眉眼间带着倔强与隐忍"
+      },
+      {
+        "name": "陆景琛",
+        "age": 30,
+        "gender": "男",
+        "appearance": "剑眉星目，面容冷峻，坐轮椅但上身挺拔有力，穿深色定制西装",
+        "personality": "表面暴戾冷漠，实则心细如发。伪装残疾暗中调查家族内鬼",
+        "background": "陆家长子，车祸后对外宣称残疾。实则秘密调查家族商业帝国中的叛徒",
+        "clothing": "深色定制三件套西装，银色袖扣，偶尔披一件黑色长大衣",
+        "fixed_prompt": "A handsome Chinese man, 30 years old, sharp eyebrows and starry eyes, cold expression, sitting in a wheelchair but with a powerful upper body, wearing a dark custom three-piece suit with silver cufflinks, mansion study background",
+        "visual_description": "30岁中国英俊男性，剑眉星目，面容冷峻。坐轮椅但上身挺拔。深色定制三件套西装，银色袖扣"
+      },
+      {
+        "name": "陆老夫人",
+        "age": 68,
+        "gender": "女",
+        "appearance": "头发花白但精神矍铄，穿暗红色唐装，手持翡翠拐杖",
+        "personality": "表面慈祥，实则心机深沉。陆家真正的掌权者",
+        "background": "陆家老太太，一手建立陆家商业帝国。对孙辈严厉，暗中考验苏婉宁",
+        "clothing": "暗红色丝绒唐装，翡翠手镯，银发髻插玉簪",
+        "fixed_prompt": "An elderly Chinese woman, 68 years old, silver hair in a bun, spirited eyes, wearing a dark red velvet tang jacket with jade bracelet, holding an emerald cane, traditional mansion hall background",
+        "visual_description": "68岁中国老年女性，银发盘髻插玉簪，精神矍铄。暗红色丝绒唐装，翡翠手镯。手持翡翠拐杖"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-003",
+    "characters": [
+      {
+        "name": "陈默",
+        "age": 22,
+        "gender": "女",
+        "appearance": "短发利落，戴圆框眼镜，穿冲锋衣和登山靴，背大容量登山包",
+        "personality": "冷静理性，行动力极强。平时沉默寡言，关键时刻果断决绝",
+        "background": "大学生物系，有野外生存社团经验。父母在外地，独居",
+        "clothing": "军绿色冲锋衣，黑色工装裤，登山靴，大容量战术背包",
+        "fixed_prompt": "A young Chinese woman, 22 years old, short neat hair, round glasses, wearing an olive green hardshell jacket and black cargo pants with hiking boots, carrying a large tactical backpack, determined expression, university campus background",
+        "visual_description": "22岁中国青年女性，短发利落，圆框眼镜。军绿色冲锋衣，黑色工装裤，登山靴。背大容量战术背包"
+      },
+      {
+        "name": "老周",
+        "age": 55,
+        "gender": "男",
+        "appearance": "头发花白，面容沧桑，穿旧夹克，手上有厚茧",
+        "personality": "沉默寡言但心地善良。退伍军人，有丰富的生存经验",
+        "background": "废品站老板，退伍军人。陈默囤货时结识，成为可靠的伙伴",
+        "clothing": "棕色旧皮夹克，灰色工装裤，军靴",
+        "fixed_prompt": "A middle-aged Chinese man, 55 years old, gray hair, weathered face, wearing a brown old leather jacket and gray work pants with military boots, calloused hands, scrapyard background",
+        "visual_description": "55岁中国中年男性，头发花白，面容沧桑。棕色旧皮夹克，灰色工装裤，军靴。手上有厚茧"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-004",
+    "characters": [
+      {
+        "name": "叶灵",
+        "age": 25,
+        "gender": "女",
+        "appearance": "明眸善睐，活泼灵动，穿越后穿淡蓝色交领襦裙，围一条布围裙",
+        "personality": "开朗乐观，脑子灵活。遇到困难先想办法而不是抱怨",
+        "background": "现代奶茶店老板，意外穿越到古代小镇。靠调制饮品的手艺谋生",
+        "clothing": "淡蓝色交领襦裙，米色布围裙，简单木簪挽发",
+        "fixed_prompt": "A young Chinese woman, 25 years old, bright eyes and lively expression, wearing a light blue crossed-collar ruqun (ancient Chinese dress) and a beige cloth apron, simple wooden hairpin, cheerful smile, ancient town street background",
+        "visual_description": "25岁中国青年女性，明眸善睐，活泼灵动。淡蓝色交领襦裙，米色布围裙。简单木簪挽发"
+      },
+      {
+        "name": "沈县令",
+        "age": 40,
+        "gender": "男",
+        "appearance": "面容端正，蓄短须，穿青色官袍，气质儒雅",
+        "personality": "清廉正直，爱好美食。被叶灵的饮品打动，暗中保护她",
+        "background": "本县县令，两袖清风。因品尝叶灵的'神仙水'成为常客",
+        "clothing": "青色官袍，黑色官帽，玉带",
+        "fixed_prompt": "A Chinese man, 40 years old, upright face with short beard, wearing a green official robe and black official hat with jade belt, refined scholar temperament, ancient county office background",
+        "visual_description": "40岁中国男性，面容端正，蓄短须。青色官袍，黑色官帽，玉带。气质儒雅"
+      },
+      {
+        "name": "萧将军",
+        "age": 32,
+        "gender": "男",
+        "appearance": "身材高大，面容刚毅，穿银色铠甲，腰佩长剑",
+        "personality": "豪爽直率，重情重义。战场上受伤后被叶灵的药茶治愈",
+        "background": "驻军将领，回京述职路过小镇。因受伤被叶灵救治",
+        "clothing": "银色轻甲，黑色战袍，腰佩长剑",
+        "fixed_prompt": "A tall Chinese man, 32 years old, resolute face, wearing silver light armor and black battle robe with a long sword at waist, heroic posture, ancient town street background",
+        "visual_description": "32岁中国高大男性，面容刚毅。银色轻甲，黑色战袍，腰佩长剑。气质英武"
+      }
+    ]
+  },
+  {
+    "projectId": "proj-005",
+    "characters": [
+      {
+        "name": "顾寒",
+        "age": 33,
+        "gender": "男",
+        "appearance": "面容棱角分明，眼神锐利，穿黑色风衣，左手戴一枚旧式银戒",
+        "personality": "冷静理性，执着偏执。为查父亲旧案不惜一切",
+        "background": "刑警队长，因破案能力强被调入深渊调查局。父亲十年前因一起案件失踪",
+        "clothing": "黑色长风衣，深灰色高领毛衣，黑色西裤，左手银戒",
+        "fixed_prompt": "A Chinese man, 33 years old, angular face, sharp eyes, wearing a long black trench coat and dark gray turtleneck with black pants, silver ring on left hand, brooding expression, rainy city street background",
+        "visual_description": "33岁中国男性，面容棱角分明，眼神锐利。黑色长风衣，深灰色高领毛衣。左手戴旧式银戒"
+      },
+      {
+        "name": "零号",
+        "age": 19,
+        "gender": "女",
+        "appearance": "面色苍白，眼神空洞但偶尔闪光，穿白色病号服或简单白裙，手腕有编号纹身'0'",
+        "personality": "沉默寡言，情感淡漠但逐渐恢复。能感知死者最后的情绪碎片",
+        "background": "被深渊调查局发现于某案发现场，无任何记忆。编号'零号'是调查局给她的代号",
+        "clothing": "白色简单连衣裙或病号服，赤脚或白色帆布鞋",
+        "fixed_prompt": "A young Chinese woman, 19 years old, pale complexion, hollow eyes with occasional flashes, wearing a simple white dress, number '0' tattoo on wrist, ethereal presence, dimly lit room background",
+        "visual_description": "19岁中国青年女性，面色苍白，眼神空洞。白色简单连衣裙。手腕有编号'0'纹身。气质空灵飘忽"
+      }
+    ]
+  }
+]

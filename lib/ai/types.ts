@@ -13,6 +13,8 @@ export interface ChatMessage {
 
 /** AI 请求配置 */
 export interface AIRequestConfig {
+  /** Provider 标识（如 qwen / openai / claude），用于工厂选择适配器 */
+  provider?: string;
   /** 模型名称 */
   model?: string;
   /** 温度 (0-2)，越高越随机 */
@@ -36,7 +38,7 @@ export enum GenerationType {
   LOCATION = "location", // 场景生成
   STYLE = "style", // 风格生成
   IMAGE_PROMPT = "image_prompt", // 图片 Prompt 生成
-  VIDEO_PROMPT = "video_prompt", // 视频 Prompt 生成
+  SCENE_VIDEO_PROMPT = "scene_video_prompt", // 场景视频 Prompt 生成
   CHAT = "chat", // 普通对话
 }
 

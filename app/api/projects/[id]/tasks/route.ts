@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { executeGenerationTask } from "@/lib/tasks/generation-handlers";
+import { hasDefaultAIModel } from "@/lib/ai/config";
 
 // Vercel: after() 执行 AI 任务需要足够的运行时间
 export const maxDuration = 60;
@@ -18,6 +19,11 @@ const ALLOWED_TASK_TYPES = [
   "generate_storyboard",
   "generate_storyboard_episode",
   "generate_prompt",
+  "generate_storyboard_asset",
+  "generate_scene_video_prompt",
+  "run_impact",
+  "run_regen",
+  "evaluate_prompt",
 ] as const;
 
 /**
@@ -61,16 +67,11 @@ export async function POST(
     return NextResponse.json({ error: "项目不存在" }, { status: 404 });
   }
 
-  // 2. 验证 AI 配置
-  const { data: aiConfig } = await supabase
-    .from("ai_config")
-    .select("api_key, api_base, model")
-    .eq("id", 1)
-    .maybeSingle();
-
-  if (!aiConfig?.api_key || !aiConfig?.api_base) {
+  // 2. 验证 AI 配置（检查用户默认模型）
+  const hasModel = await hasDefaultAIModel(supabase, user.id, "text");
+  if (!hasModel) {
     return NextResponse.json(
-      { error: "AI 模型未配置，请先到设置页面填写 API 地址和 API Key" },
+      { error: "AI 模型未配置，请先到「AI 模型管理」页面配置默认文本模型" },
       { status: 400 }
     );
   }
@@ -102,14 +103,38 @@ export async function POST(
 
   // 唯一索引冲突 → 查现有活跃任务返回
   if (insertError && insertError.code === "23505") {
-    const { data: existing } = await supabase
+    // 场景级任务：按 sceneId 精确查找冲突任务
+    // 集级任务：按 episodeNumber 精确查找冲突任务
+    const sceneId = (payload as Record<string, unknown>)?.sceneId as string | undefined;
+    const episodeNumber = (payload as Record<string, unknown>)?.episodeNumber as string | undefined;
+    let query = supabase
       .from("project_tasks")
-      .select("id, status, progress, task_type")
+      .select("id, status, progress, task_type, payload")
       .eq("project_id", id)
       .in("status", ["pending", "running"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
+
+    if (sceneId) {
+      query = query.eq("payload->>sceneId", sceneId);
+    } else if (episodeNumber) {
+      query = query.eq("payload->>episodeNumber", episodeNumber);
+    }
+
+    const { data: existing } = await query.limit(1).maybeSingle();
+
+    // 根据冲突类型生成更具体的错误信息
+    let errorMessage = "已有任务在执行中";
+    if (existing?.task_type === "generate_storyboard_asset") {
+      errorMessage = sceneId
+        ? "该场景的 Storyboard 正在生成中，请等待完成"
+        : "Storyboard 正在生成中，请等待完成";
+    } else if (existing?.task_type === "generate_scene_video_prompt") {
+      errorMessage = sceneId
+        ? "该场景的视频 Prompt 正在生成中，请等待完成"
+        : "场景视频 Prompt 正在生成中，请等待完成";
+    } else if (existing?.task_type === "generate_storyboard_episode") {
+      errorMessage = `第 ${episodeNumber} 集分镜正在生成中，请等待完成`;
+    }
 
     return NextResponse.json(
       {
@@ -117,7 +142,7 @@ export async function POST(
         status: existing?.status || "pending",
         progress: existing?.progress || {},
         taskType: existing?.task_type || null,
-        error: "已有任务在执行中",
+        error: errorMessage,
       },
       { status: 409 }
     );
