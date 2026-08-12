@@ -64,7 +64,7 @@ export async function buildContextPreview(
 
 /**
  * 构建故事板 AI 上下文预览
- * 复刻 generateStoryboardAsset 的 DB 查询 + user prompt 构建
+ * 复刻 generateStoryboardDocument 的 DB 查询 + user prompt 构建
  * @param sceneId 场景 ID
  */
 export async function buildStoryboardContextPreview(
@@ -160,7 +160,7 @@ export async function buildStoryboardContextPreview(
     }
   }
 
-  // 6. 构建 user prompt（与 generateStoryboardAsset 保持一致）
+  // 6. 构建 user prompt（与 generateStoryboardDocument 保持一致）
   const userParts: string[] = [];
   userParts.push("【场景信息】");
   if (scene) {
@@ -190,7 +190,7 @@ export async function buildStoryboardContextPreview(
     userParts.push(`\n【视觉风格预设】\n${stylePrompt}`);
   }
 
-  userParts.push("\n【镜头排列】（按顺序，每个镜头附有关联图片）");
+  userParts.push(`\n【镜头排列】（共 ${shots.length} 个镜头，请为每个镜头生成对应的 frame）`);
   for (const s of shots) {
     const shotCharNames = (shotCharMap.get(s.id) || [])
       .map((cid) => charMap.get(cid)?.name || "未知")
@@ -203,10 +203,9 @@ export async function buildStoryboardContextPreview(
     if (s.environment) userParts.push(`环境细节: ${s.environment}`);
     if (s.cinematography) userParts.push(`摄影手法: ${s.cinematography}`);
     if (s.dialogue) userParts.push(`对白: ${s.dialogue}`);
-    userParts.push(`[已有关联图片]`);
   }
 
-  userParts.push("\n请基于以上完整信息，生成详细的场景故事板（Storyboard）描述。必须包含所有部分：场景环境、角色描述、镜头序列（逐镜头描述）、转场与节奏、视觉风格、故事板画面生成指令。输出内容需要丰富且具体，可直接用于 AI 生成故事板画面。");
+  userParts.push(`\n请基于以上完整信息，生成结构化的场景视觉规划文档。frames 数组必须包含 ${shots.length} 个镜头帧，emotion_curve 必须包含 ${shots.length} 个数据点。只输出 JSON，不要输出其他内容。`);
 
   return {
     systemMessage: STORYBOARD_ASSET_SYSTEM_PROMPT,

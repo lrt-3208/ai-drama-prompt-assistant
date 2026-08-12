@@ -1,11 +1,12 @@
 // ============================================
 // Model: storyboards — 场景视觉故事板资产数据访问层
-// Scene 级组合资产，包含该场景所有 Shot 图片编排 + assistant_prompt
+// Scene 级组合资产，包含该场景所有 Shot 图片编排 + document（结构化视觉规划文档）
 // ============================================
 
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { StoryboardDocument } from "@/lib/storyboard/document-types";
 
 /** DI 上下文 */
 export interface ModelContext {
@@ -23,8 +24,9 @@ export interface StoryboardRow {
   scene_id: string;
   project_id: string;
   status: string;
-  storyboard_image: string | null;
-  assistant_prompt: string | null;
+  storyboard_image_asset_id: string | null; // 优化后的故事板图片 asset ID
+  optimized_image_prompt: string | null; // 故事板图片优化提示词（英文，程序化生成）
+  document: StoryboardDocument | null; // AI 生成的结构化文档（JSONB）
   image_refs: Array<{ shot_id: string; asset_id: string; shot_number: number }> | null;
   is_stale: boolean;
   stale_reason: string | null;
@@ -39,7 +41,7 @@ export interface StoryboardVersionRow {
   id: string;
   storyboard_id: string;
   project_id: string;
-  assistant_prompt: string;
+  document: StoryboardDocument; // AI 生成的结构化文档（JSONB）
   image_refs: Array<{ shot_id: string; asset_id: string; shot_number: number }> | null;
   version_number: number;
   is_current: boolean;
@@ -131,15 +133,14 @@ export async function updateStatus(
 }
 
 /**
- * 更新 Storyboard 资产内容（assistant_prompt + image_refs + status）
+ * 更新 Storyboard 资产内容（document + image_refs + status）
  * 自动递增 version_number + 保存版本历史到 storyboard_versions
  */
 export async function updateAsset(
   storyboardId: string,
   params: {
-    assistant_prompt?: string;
+    document?: StoryboardDocument;
     image_refs?: Array<{ shot_id: string; asset_id: string; shot_number: number }>;
-    storyboard_image?: string;
     status?: string;
     source?: string;
     ai_model?: string;
@@ -152,7 +153,7 @@ export async function updateAsset(
   // 查询当前 version_number + project_id
   const { data: current } = await supabase
     .from("storyboards")
-    .select("version_number, project_id, assistant_prompt, image_refs")
+    .select("version_number, project_id, document, image_refs")
     .eq("id", storyboardId)
     .single();
 
@@ -165,14 +166,11 @@ export async function updateAsset(
     stale_reason: null,
   };
 
-  if (params.assistant_prompt !== undefined) {
-    updateData.assistant_prompt = params.assistant_prompt;
+  if (params.document !== undefined) {
+    updateData.document = params.document;
   }
   if (params.image_refs !== undefined) {
     updateData.image_refs = params.image_refs;
-  }
-  if (params.storyboard_image !== undefined) {
-    updateData.storyboard_image = params.storyboard_image;
   }
   if (params.status !== undefined) {
     updateData.status = params.status;
@@ -188,7 +186,7 @@ export async function updateAsset(
   if (error) throw new Error(`更新 Storyboard 资产失败: ${error.message}`);
 
   // 保存版本历史
-  if (params.assistant_prompt !== undefined && projectId) {
+  if (params.document !== undefined && projectId) {
     // 将旧版本的 is_current 置 false（检查结果，失败则抛出错误）
     const { error: unsetCurrentError } = await supabase
       .from("storyboard_versions")
@@ -203,7 +201,7 @@ export async function updateAsset(
     const { error: insertVersionError } = await supabase.from("storyboard_versions").insert({
       storyboard_id: storyboardId,
       project_id: projectId,
-      assistant_prompt: params.assistant_prompt,
+      document: params.document,
       image_refs: params.image_refs ?? current?.image_refs,
       version_number: newVersionNumber,
       is_current: true,
@@ -300,7 +298,7 @@ export async function switchVersion(
   const { data, error } = await supabase
     .from("storyboards")
     .update({
-      assistant_prompt: version.assistant_prompt,
+      document: version.document,
       image_refs: version.image_refs,
     })
     .eq("id", storyboardId)
@@ -312,7 +310,7 @@ export async function switchVersion(
 }
 
 /**
- * 递增 version_number（用于 assistant_prompt 直接编辑，同时保存版本）
+ * 递增 version_number（用于 document 直接编辑，同时保存版本）
  */
 export async function incrementVersion(
   storyboardId: string,
@@ -323,7 +321,7 @@ export async function incrementVersion(
   // 查询当前信息
   const { data: current } = await supabase
     .from("storyboards")
-    .select("version_number, project_id, assistant_prompt, image_refs")
+    .select("version_number, project_id, document, image_refs")
     .eq("id", storyboardId)
     .single();
 
@@ -341,7 +339,7 @@ export async function incrementVersion(
   if (error) throw new Error(`递增 Storyboard 版本失败: ${error.message}`);
 
   // 保存版本历史
-  if (current?.assistant_prompt && current?.project_id) {
+  if (current?.document && current?.project_id) {
     const { error: unsetErr } = await supabase
       .from("storyboard_versions")
       .update({ is_current: false })
@@ -354,7 +352,7 @@ export async function incrementVersion(
     const { error: insertErr } = await supabase.from("storyboard_versions").insert({
       storyboard_id: storyboardId,
       project_id: current.project_id,
-      assistant_prompt: current.assistant_prompt,
+      document: current.document,
       image_refs: current.image_refs,
       version_number: newVersionNumber,
       is_current: true,
@@ -365,5 +363,38 @@ export async function incrementVersion(
     }
   }
 
+  return data;
+}
+
+/**
+ * 更新故事板图片 asset 关联 + 优化提示词
+ * 用于故事板图片生成完成后记录 asset ID 和 prompt
+ */
+export async function updateImageAsset(
+  storyboardId: string,
+  params: {
+    assetId?: string;
+    optimizationPrompt?: string;
+  },
+  ctx?: ModelContext
+): Promise<StoryboardRow> {
+  const supabase = ctx?.supabase ?? await getDefaultClient();
+
+  const updateData: Record<string, unknown> = {};
+  if (params.assetId !== undefined) {
+    updateData.storyboard_image_asset_id = params.assetId;
+  }
+  if (params.optimizationPrompt !== undefined) {
+    updateData.optimized_image_prompt = params.optimizationPrompt;
+  }
+
+  const { data, error } = await supabase
+    .from("storyboards")
+    .update(updateData)
+    .eq("id", storyboardId)
+    .select("*")
+    .single();
+
+  if (error) throw new Error(`更新故事板图片 asset 失败: ${error.message}`);
   return data;
 }

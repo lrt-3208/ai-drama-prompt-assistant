@@ -6,6 +6,8 @@ import type {
   AIRequestConfig,
   AIResult,
   ChatMessage,
+  ImageGenerationRequest,
+  ImageGenerationResult,
   ProviderCapabilities,
 } from "../types";
 import { AIError, AIErrorType } from "../types";
@@ -43,7 +45,7 @@ export class QwenProvider implements AIProvider {
   readonly capabilities: ProviderCapabilities = {
     jsonMode: true,
     streaming: false,
-    maxTokens: 8192,
+    maxTokens: 16384,
   };
 
   private readonly apiKey: string;
@@ -203,5 +205,23 @@ export class QwenProvider implements AIProvider {
       promptTokens: data.usage?.prompt_tokens,
       completionTokens: data.usage?.completion_tokens,
     };
+  }
+
+  /**
+   * 图片生成（占位实现）
+   *
+   * 当前阶段抛出明确错误，提示用户配置图片生成模型。
+   * 后续对接实际图片 API（Seedream / DALL-E 等）时，
+   * 在此方法中实现具体的图生图 API 调用逻辑。
+   */
+  async generateImage(
+    _request: ImageGenerationRequest,
+    _config?: AIRequestConfig
+  ): Promise<ImageGenerationResult> {
+    throw new AIError(
+      "图片生成功能尚未配置：请在设置页面配置图片生成模型（modality=image）",
+      AIErrorType.AUTH,
+      false
+    );
   }
 }

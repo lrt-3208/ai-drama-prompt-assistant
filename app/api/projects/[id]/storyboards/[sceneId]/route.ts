@@ -6,12 +6,13 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { executeGenerationTask } from "@/lib/tasks/generation-handlers";
 import * as Storyboards from "@/lib/models/storyboards";
 import { createImpactTask } from "@/lib/lifecycle/impact-engine";
+import type { StoryboardDocument } from "@/lib/storyboard/document-types";
 
 /**
  * PATCH /api/projects/[id]/storyboards/[sceneId]
  *
- * 用户手动编辑 Storyboard assistant_prompt
- * → version_number 自动递增
+ * 更新 Storyboard（document 手动编辑）
+ * → document 更新通过 updateAsset（自动递增版本号 + 保存版本历史）
  * → 触发 impact（标记引用该 Storyboard 的 Scene Video Prompt stale）
  */
 export async function PATCH(
@@ -43,21 +44,13 @@ export async function PATCH(
 
   // 2. 解析 body
   const body = await request.json().catch(() => ({}));
-  const { assistant_prompt, storyboard_image } = body as {
-    assistant_prompt?: string;
-    storyboard_image?: string;
+  const { document } = body as {
+    document?: StoryboardDocument;
   };
 
-  // 至少提供一个字段
-  if (assistant_prompt === undefined && storyboard_image === undefined) {
+  if (document === undefined) {
     return NextResponse.json(
-      { error: "请提供 assistant_prompt 或 storyboard_image" },
-      { status: 400 }
-    );
-  }
-  if (assistant_prompt !== undefined && !assistant_prompt.trim()) {
-    return NextResponse.json(
-      { error: "assistant_prompt 不能为空" },
+      { error: "请提供 document" },
       { status: 400 }
     );
   }
@@ -71,41 +64,14 @@ export async function PATCH(
     );
   }
 
-  // 4. 更新 Storyboard
-  //    - storyboard_image 单独更新（不递增版本号、不保存版本历史）
-  //    - assistant_prompt 通过 updateAsset 更新（自动递增版本号 + 保存版本历史）
-  if (storyboard_image !== undefined && assistant_prompt === undefined) {
-    // 仅更新图片
-    const { data: updatedImg, error: imgError } = await supabase
-      .from("storyboards")
-      .update({ storyboard_image: storyboard_image })
-      .eq("id", storyboard.id)
-      .select("*")
-      .single();
-    if (imgError) {
-      return NextResponse.json({ error: "更新图片失败" }, { status: 500 });
-    }
-    return NextResponse.json({
-      data: {
-        id: updatedImg.id,
-        version_number: updatedImg.version_number,
-        storyboard_image: updatedImg.storyboard_image,
-      },
-    });
-  }
-
-  // 更新 assistant_prompt（updateAsset 自动递增 version_number + 保存版本历史）
-  const updateParams: Parameters<typeof Storyboards.updateAsset>[1] = {
-    assistant_prompt: assistant_prompt!.trim(),
-    project_id: id,
-    source: "manual",
-  };
-  if (storyboard_image !== undefined) {
-    updateParams.storyboard_image = storyboard_image;
-  }
+  // 4. 更新 document（updateAsset 自动递增 version_number + 保存版本历史）
   const updated = await Storyboards.updateAsset(
     storyboard.id,
-    updateParams,
+    {
+      document: document!,
+      project_id: id,
+      source: "manual",
+    },
     { supabase }
   );
 
@@ -132,7 +98,7 @@ export async function PATCH(
     data: {
       id: updated.id,
       version_number: updated.version_number,
-      assistant_prompt: updated.assistant_prompt,
+      document: updated.document,
     },
   });
 }

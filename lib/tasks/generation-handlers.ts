@@ -25,6 +25,8 @@ import { generateImagePrompt } from "@/lib/prompt-engine/prompt-generator";
 import { generateSceneVideoPrompt } from "@/lib/prompt-engine/scene-video-prompt-generator";
 import { evaluatePromptQuality } from "@/lib/prompt-engine/prompt-evaluator";
 import type { PromptEngineContext } from "@/lib/prompt-engine/context-builder";
+import { generateStoryboardImage } from "@/lib/storyboard/image-generator";
+import type { ImageGeneratorContext } from "@/lib/storyboard/image-generator";
 import { runImpact, type ImpactPayload } from "@/lib/lifecycle/impact-engine";
 import { runIncrementalRegen } from "@/lib/lifecycle/incremental-regen";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
@@ -52,18 +54,26 @@ export async function executeGenerationTask(
   }
 
   // model_snapshot — 记录任务使用的 AI 模型快照（业务层直接 update，无 RPC）
-  const modelConfig = await getUserDefaultAIModel(supabase, task.user_id, "text");
-  await supabase.from("project_tasks").update({
-    payload: {
-      ...task.payload,
-      model_snapshot: {
-        provider: modelConfig.provider,
-        model: modelConfig.model,
+  // generate_storyboard_image 不调用 AI，跳过 model config 读取
+  const skipModelConfig = task.task_type === "generate_storyboard_image";
+  if (!skipModelConfig) {
+    const modelConfig = await getUserDefaultAIModel(
+      supabase,
+      task.user_id,
+      "text"
+    );
+    await supabase.from("project_tasks").update({
+      payload: {
+        ...task.payload,
+        model_snapshot: {
+          provider: modelConfig.provider,
+          model: modelConfig.model,
+        },
       },
-    },
-  }).eq("id", taskId);
+    }).eq("id", taskId);
+  }
 
-  const ctx: AIActionContext & StoryboardActionContext & StoryboardAssetActionContext & PromptEngineContext = { supabase };
+  const ctx: AIActionContext & StoryboardActionContext & StoryboardAssetActionContext & PromptEngineContext & ImageGeneratorContext = { supabase };
   const payload = task.payload || {};
   let ok = false;
   let errorMsg: string | undefined;
@@ -171,6 +181,16 @@ export async function executeGenerationTask(
         await evaluatePromptQuality(
           payload.promptId as string,
           task.user_id,
+          ctx
+        );
+        break;
+
+      case "generate_storyboard_image":
+        await generateStoryboardImage(
+          payload.sceneId as string,
+          task.project_id,
+          task.user_id,
+          payload.screenshotTosKey as string,
           ctx
         );
         break;

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 
 interface Project {
   id: string;
@@ -26,6 +27,30 @@ interface Project {
   created_at: string;
   updated_at: string;
 }
+
+interface GenConfig {
+  character_count: { min: number; max: number };
+  location_count: { min: number; max: number };
+  episode_count: { min: number; max: number };
+  scenes_per_episode: { min: number; max: number };
+  shots_per_scene: { min: number; max: number };
+}
+
+const DEFAULT_GEN_CONFIG: GenConfig = {
+  character_count: { min: 3, max: 8 },
+  location_count: { min: 3, max: 8 },
+  episode_count: { min: 3, max: 10 },
+  scenes_per_episode: { min: 2, max: 6 },
+  shots_per_scene: { min: 2, max: 6 },
+};
+
+const CONFIG_LABELS: { key: keyof GenConfig; label: string }[] = [
+  { key: "character_count", label: "角色数量" },
+  { key: "location_count", label: "场景数量" },
+  { key: "episode_count", label: "剧本集数" },
+  { key: "scenes_per_episode", label: "每集场景数" },
+  { key: "shots_per_scene", label: "每场景镜头数" },
+];
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
   draft: { label: "草稿", variant: "secondary" },
@@ -44,6 +69,8 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
   const [name, setName] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [genre, setGenre] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [genConfig, setGenConfig] = useState<GenConfig>(DEFAULT_GEN_CONFIG);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +83,7 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
     const res = await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, synopsis, genre }),
+      body: JSON.stringify({ name, synopsis, genre, generation_config: genConfig }),
     });
 
     const data = await res.json();
@@ -72,6 +99,8 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
     setName("");
     setSynopsis("");
     setGenre("");
+    setShowAdvanced(false);
+    setGenConfig(DEFAULT_GEN_CONFIG);
     router.push(`/projects/${data.data.id}`);
     router.refresh();
   };
@@ -107,6 +136,8 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
               name={name} setName={setName}
               synopsis={synopsis} setSynopsis={setSynopsis}
               genre={genre} setGenre={setGenre}
+              showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
+              genConfig={genConfig} setGenConfig={setGenConfig}
               loading={loading}
               onSubmit={handleCreate}
             />
@@ -132,6 +163,8 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
               name={name} setName={setName}
               synopsis={synopsis} setSynopsis={setSynopsis}
               genre={genre} setGenre={setGenre}
+              showAdvanced={showAdvanced} setShowAdvanced={setShowAdvanced}
+              genConfig={genConfig} setGenConfig={setGenConfig}
               loading={loading}
               onSubmit={handleCreate}
             />
@@ -183,7 +216,9 @@ export function ProjectList({ initialProjects }: { initialProjects: Project[] })
 }
 
 function ProjectForm({
-  name, setName, synopsis, setSynopsis, genre, setGenre, loading, onSubmit,
+  name, setName, synopsis, setSynopsis, genre, setGenre,
+  showAdvanced, setShowAdvanced, genConfig, setGenConfig,
+  loading, onSubmit,
 }: {
   name: string;
   setName: (v: string) => void;
@@ -191,6 +226,10 @@ function ProjectForm({
   setSynopsis: (v: string) => void;
   genre: string;
   setGenre: (v: string) => void;
+  showAdvanced: boolean;
+  setShowAdvanced: (v: boolean) => void;
+  genConfig: GenConfig;
+  setGenConfig: (v: GenConfig) => void;
   loading: boolean;
   onSubmit: (e: React.FormEvent) => void;
 }) {
@@ -208,6 +247,41 @@ function ProjectForm({
         <Label htmlFor="genre">类型</Label>
         <Input id="genre" value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="如：都市/悬疑/古风" />
       </div>
+
+      {/* 高级配置 */}
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronDown className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+        高级配置
+      </button>
+      {showAdvanced && (
+        <div className="flex flex-col gap-3 rounded-lg border p-4">
+          {CONFIG_LABELS.map(({ key, label }) => (
+            <div key={key} className="flex items-center gap-2">
+              <Label className="text-xs whitespace-nowrap w-20">{label}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={genConfig[key].min}
+                onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], min: Number(e.target.value) } })}
+                className="w-16"
+              />
+              <span className="text-xs text-muted-foreground">~</span>
+              <Input
+                type="number"
+                min={0}
+                value={genConfig[key].max}
+                onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], max: Number(e.target.value) } })}
+                className="w-16"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
       <Button type="submit" disabled={loading}>
         {loading ? "创建中..." : "创建"}
       </Button>

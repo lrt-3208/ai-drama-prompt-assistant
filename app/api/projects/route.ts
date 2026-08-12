@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, synopsis, genre } = body;
+  const { name, synopsis, genre, generation_config } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "项目名称不能为空" }, { status: 400 });
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       genre: genre?.trim() || null,
       status: "draft",
       asset_status: "draft",
+      generation_config: generation_config || null,
     })
     .select("id, name, synopsis, genre, status, created_at")
     .single();

@@ -39,6 +39,7 @@ export enum GenerationType {
   STYLE = "style", // 风格生成
   IMAGE_PROMPT = "image_prompt", // 图片 Prompt 生成
   SCENE_VIDEO_PROMPT = "scene_video_prompt", // 场景视频 Prompt 生成
+  STORYBOARD_IMAGE = "storyboard_image", // 故事板图片优化
   CHAT = "chat", // 普通对话
 }
 
@@ -101,4 +102,28 @@ export class AIError extends Error {
     this.retryable = retryable;
     this.statusCode = statusCode;
   }
+}
+
+/** 图片生成请求 */
+export interface ImageGenerationRequest {
+  /** 优化提示词 */
+  prompt: string;
+  /** 参考图片 base64（DOM 截图） */
+  referenceImage?: string;
+  /** 输出宽度 */
+  width?: number;
+  /** 输出高度 */
+  height?: number;
+  /** 负面提示词 */
+  negativePrompt?: string;
+}
+
+/** 图片生成结果 */
+export interface ImageGenerationResult {
+  /** 生成图片的 URL（base64 或远程 URL） */
+  imageUrl: string;
+  /** 使用的模型 */
+  model: string;
+  /** 耗时 ms */
+  elapsed: number;
 }

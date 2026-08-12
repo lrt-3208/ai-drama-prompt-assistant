@@ -6,6 +6,8 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { StoryboardDocument } from "@/lib/storyboard/document-types";
+import { getPublicUrl } from "@/lib/tos/public-url";
 
 /** DI 上下文 */
 export interface SceneContextDI {
@@ -67,11 +69,11 @@ export interface SceneVideoContext {
   shots: ShotWithPrompt[];
   storyboard: {
     id: string;
-    assistant_prompt: string | null;
-    storyboard_image: string | null;
+    document: StoryboardDocument | null;
     image_refs: Array<{ shot_id: string; asset_id: string; shot_number: number }> | null;
     version_number: number;
     status: string;
+    storyboardImageUrl: string | null;
   } | null;
   characters: SceneCharacter[];
   location: {
@@ -201,12 +203,26 @@ export async function buildSceneVideoContext(
     };
   });
 
-  // 3. 查询 Storyboard
+  // 3. 查询 Storyboard Document
   const { data: storyboard } = await supabase
     .from("storyboards")
-    .select("id, assistant_prompt, storyboard_image, image_refs, version_number, status")
+    .select("id, document, image_refs, version_number, status, storyboard_image_asset_id")
     .eq("scene_id", sceneId)
     .maybeSingle();
+
+  // 3b. 查询故事板优化图片 URL
+  let storyboardImageUrl: string | null = null;
+  if (storyboard?.storyboard_image_asset_id) {
+    const { data: sbAsset } = await supabase
+      .from("assets")
+      .select("tos_key")
+      .eq("id", storyboard.storyboard_image_asset_id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (sbAsset?.tos_key) {
+      storyboardImageUrl = getPublicUrl(sbAsset.tos_key);
+    }
+  }
 
   // 4. 查询角色（通过 shot_characters JOIN，去重）
   const characterIds = new Set<string>();
@@ -380,11 +396,11 @@ export async function buildSceneVideoContext(
     storyboard: storyboard
       ? {
           id: storyboard.id,
-          assistant_prompt: storyboard.assistant_prompt,
-          storyboard_image: storyboard.storyboard_image,
+          document: storyboard.document as StoryboardDocument | null,
           image_refs: storyboard.image_refs,
           version_number: storyboard.version_number,
           status: storyboard.status,
+          storyboardImageUrl,
         }
       : null,
     characters,
@@ -424,17 +440,34 @@ export function formatSceneContextAsPrompt(context: SceneVideoContext): string {
     }
   }
 
-  // Storyboard 描述
-  if (context.storyboard?.assistant_prompt) {
-    parts.push("\n【Storyboard 辅助描述】");
-    parts.push(context.storyboard.assistant_prompt);
+  // Storyboard Document（结构化视觉规划文档）
+  if (context.storyboard?.document) {
+    const doc = context.storyboard.document;
+    parts.push("\n【Storyboard 视觉规划文档】");
+    parts.push(`色调: ${doc.header.color_scheme}`);
+    parts.push(`氛围: ${doc.header.mood_tone}`);
+    parts.push(`剪辑节奏: ${doc.header.editing_rhythm}`);
+    if (doc.frames.length > 0) {
+      parts.push("\n镜头帧:");
+      for (const f of doc.frames) {
+        parts.push(`  S${f.shot_number} [${f.shot_type}] ${f.description} | 运镜:${f.camera_movement} | 光影:${f.lighting} | 情绪:${f.emotion} | 转场:${f.transition}`);
+      }
+    }
+    if (doc.emotion_curve.length > 0) {
+      parts.push("\n情绪曲线:");
+      for (const e of doc.emotion_curve) {
+        parts.push(`  S${e.shot_number}: ${e.emotion} (强度${e.intensity}/10)`);
+      }
+    }
+    parts.push(`\n音频: 环境声=${doc.audio.environment_sound}, 音乐=${doc.audio.music}, 关键音效=[${doc.audio.key_sound_effects.join(", ")}]`);
+    parts.push(`摄影笔记: 镜头=${doc.cinematography_notes.lens_spec}, 运镜风格=${doc.cinematography_notes.movement_style}, 转场偏好=${doc.cinematography_notes.transition_pref}`);
   }
 
-  // Storyboard 参考图
-  if (context.storyboard?.storyboard_image) {
-    parts.push("\n【Storyboard 参考图】");
-    parts.push(`故事板图片 URL: ${context.storyboard.storyboard_image}`);
-    parts.push("（此图片为场景所有镜头组合的故事板画面，生成视频时请参考其构图、角色位置和镜头排列）");
+  // 故事板优化图片
+  if (context.storyboard?.storyboardImageUrl) {
+    parts.push("\n【故事板优化图片】");
+    parts.push(`参考图片 URL: ${context.storyboard.storyboardImageUrl}`);
+    parts.push("（请参考此图片理解场景的视觉布局和镜头序列）");
   }
 
   // 角色fixed_prompt（去重）

@@ -14,6 +14,8 @@ interface CopyAllImagesButtonProps {
   characters: ImageRef[];
   locations: ImageRef[];
   shots: ImageRef[];
+  /** 故事板优化图片 URL */
+  storyboardImageUrl?: string | null;
   /** asset_id → 公共 URL 映射（由服务端构造，公共读桶无需签名） */
   assetUrls?: Record<string, string>;
 }
@@ -38,6 +40,7 @@ export function CopyAllImagesButton({
   characters,
   locations,
   shots,
+  storyboardImageUrl = null,
   assetUrls = {},
 }: CopyAllImagesButtonProps) {
   const [copying, setCopying] = useState(false);
@@ -69,6 +72,11 @@ export function CopyAllImagesButton({
         sections.push(`[场景参考]\n${locUrls.join("\n")}`);
       }
 
+      // 故事板优化图片
+      if (storyboardImageUrl) {
+        sections.push(`[故事板优化图片]\n${storyboardImageUrl}`);
+      }
+
       // 镜头序列
       const shotUrls = shots
         .map((s) => getUrl(s.asset_id))
@@ -86,7 +94,8 @@ export function CopyAllImagesButton({
 
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success(`已复制 ${charUrls.length + locUrls.length + shotUrls.length} 张图片 URL`);
+      const totalCount = charUrls.length + locUrls.length + shotUrls.length + (storyboardImageUrl ? 1 : 0);
+      toast.success(`已复制 ${totalCount} 张图片 URL`);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error("复制失败");
@@ -98,7 +107,8 @@ export function CopyAllImagesButton({
   const hasImages =
     characters.some((c) => c.asset_id) ||
     locations.some((l) => l.asset_id) ||
-    shots.some((s) => s.asset_id);
+    shots.some((s) => s.asset_id) ||
+    !!storyboardImageUrl;
 
   if (!hasImages) return null;
 

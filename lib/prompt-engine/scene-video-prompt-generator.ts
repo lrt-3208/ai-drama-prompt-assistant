@@ -43,40 +43,40 @@ export const SCENE_VIDEO_SYSTEM_PROMPT = `你是一位顶级 AI 视频提示词�
 
 【Prompt 结构要求（必须包含以下 6 个部分，缺一不可）】
 
-一、场景环境详描（80-150字）
+一、场景环境详描
 - 时间、天气、光照条件（月光/雨/雾/室内灯等）
 - 地点空间结构（空间纵深、材质、碎片、破损程度等）
 - 环境氛围与动态元素（雨滴、灰尘、光影闪烁、风吹等）
 - 与角色情绪呼应的环境隐喻
 
-二、角色外观与动作（每个角色 60-100字）
+二、角色外观与动作
 - 完整外貌描述（年龄、体型、发型、五官特征、伤疤等）
 - 服装详细描述（颜色、材质、配饰、破损等）
 - 在场景中的位置和肢体动作（走、蹲、伸手、转身等）
 - 面部表情和情绪状态
 - 角色之间的空间关系和互动
 
-三、镜头运动与转场（80-120字）
+三、镜头运动与转场
 - 开场镜头描述（景别、角度、运动方式：推/拉/摇/移/跟/环绕）
 - 镜头之间的转场方式（连续切换、叠化、匹配剪辑等）
 - 每个镜头的运镜节奏（缓慢推进/手持微晃/快速跟拍等）
 - 景别变化序列（远景→中景→特写等）
 - 关键时刻的镜头强调（特写、慢动作、环绕等）
 
-四、光影与色彩氛围（60-100字）
+四、光影与色彩氛围
 - 主光源类型和方向（自然光/人造光/体积光）
 - 明暗对比和阴影描述
 - 色调描述（冷/暖、饱和度、去饱和程度）
 - 色彩对比关系（如冷调环境与暖色光源的对比）
 - 情绪转变时的色彩变化
 
-五、特效与超自然元素（如有，60-100字）
+五、特效与超自然元素（如有）
 - 粒子效果（光点、灰尘、火花等）
 - 能量/光芒/法术效果的视觉描述
 - 物理异常（穿透、悬浮、扭曲等）
 - 与角色动作的配合关系
 
-六、技术规格与风格关键词（50-80字，英文）
+六、技术规格与风格关键词（英文）
 - 摄影技术术语：Cinematic lighting, shallow depth of field, 35mm film grain 等
 - 镜头规格：anamorphic lens, volumetric lighting 等
 - 画质规格：8k resolution, photorealistic 等
@@ -91,7 +91,7 @@ negative_prompt 应包含：
 - 水印文字：watermark, text, signature 等
 
 【重要提示】
-- 正面 Prompt 总字数应在 400-800字（中文部分），确保足够详尽
+- 正面 Prompt 应尽可能详尽，确保视频生成质量
 - 不要简化或概括，每个部分都要有具体、可执行的描述
 - 角色描述必须包含完整的 fixed_prompt 内容（年龄、体型、发型、服装等）
 - 镜头运动要有明确的起止和节奏
@@ -101,7 +101,7 @@ negative_prompt 应包含：
 【输出格式】
 请以 JSON 格式输出，不要输出任何其他内容：
 {
-  "prompt": "正面提示词（视频生成用，400-800字）",
+  "prompt": "正面提示词（视频生成用）",
   "negative_prompt": "负面提示词（英文逗号分隔）"
 }
 
@@ -113,10 +113,9 @@ negative_prompt 应包含：
  * 生成场景级视频 Prompt
  *
  * 前置条件：
- * 1. Storyboard 存在且 status='ready'
- * 2. Storyboard 图片已上传（storyboard_image 不为空）
- * 3. 该 Scene 所有 Shot 都有 Image Prompt
- * 4. 该 Scene 所有 Shot 都有 active 图片资产
+ * 1. Storyboard 存在且 status='ready'（包含结构化文档）
+ * 2. 该 Scene 所有 Shot 都有 Image Prompt
+ * 3. 该 Scene 所有 Shot 都有 active 图片资产
  *
  * @param sceneId 场景 ID
  * @param projectId 项目 ID
@@ -144,11 +143,6 @@ export async function generateSceneVideoPrompt(
   }
   if (storyboard.status !== "ready") {
     throw new Error(`Storyboard 状态为 ${storyboard.status}，请先生成 Storyboard`);
-  }
-
-  // 0a-2. 检查 Storyboard 图片是否已上传
-  if (!storyboard.storyboard_image) {
-    throw new Error("请先上传故事板图片后再生成场景视频 Prompt");
   }
 
   // 0b + 0c. 构建 SceneVideoContext（内部包含 Shot Image Prompt 检查 + 图片资产检查）

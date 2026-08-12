@@ -11,7 +11,7 @@ import { createImpactTask } from "@/lib/lifecycle/impact-engine";
  * PATCH /api/projects/[id]/storyboards/[sceneId]/versions
  *
  * 切换 Storyboard 当前版本
- * → 更新 storyboards 主表 assistant_prompt + image_refs
+ * → 更新 storyboards 主表 document + image_refs
  * → 触发 impact（标记引用该 Storyboard 的 Scene Video Prompt stale）
  */
 export async function PATCH(
@@ -91,7 +91,7 @@ export async function PATCH(
     data: {
       id: updated.id,
       version_number: updated.version_number,
-      assistant_prompt: updated.assistant_prompt,
+      document: updated.document,
     },
   });
 }

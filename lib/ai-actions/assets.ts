@@ -11,6 +11,7 @@ import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import * as AssetVersions from "@/lib/models/asset-versions";
 import { runImpact } from "@/lib/lifecycle/impact-engine";
+import { getGenerationConfig, type GenerationConfig } from "@/lib/ai-actions/config";
 
 /** 依赖注入上下文：不传则 fallback 到 cookie client */
 export interface AIActionContext {
@@ -177,7 +178,8 @@ export async function enrichStory(
 // 2. generateCharacters — 角色生成（merge 模式）
 // ============================================
 
-const CHARACTER_SYSTEM_PROMPT = `你是一位专业的短剧角色设计师。根据故事创意，生成 3-6 个角色。
+function buildCharacterSystemPrompt(config: GenerationConfig): string {
+  return `你是一位专业的短剧角色设计师。根据故事创意，生成 ${config.character_count.min}-${config.character_count.max} 个角色。
 
 【语言要求】所有描述性字段（name/appearance/personality/background/clothing）必须用中文输出，仅 fixed_prompt 用英文。
 
@@ -192,7 +194,14 @@ const CHARACTER_SYSTEM_PROMPT = `你是一位专业的短剧角色设计师。�
 - personality: 性格描述（中文）
 - background: 背景故事（中文）
 - clothing: 标志性服装描述（中文）
-- fixed_prompt: 固定视觉 Prompt（英文，如"young Chinese man, short black hair, sharp eyes, wearing dark suit, confident expression"）
+- fixed_prompt: 固定视觉 Prompt（英文，用于生成角色定妆照，必须包含站立姿态和纯净背景，如"young Chinese man, short black hair, sharp eyes, wearing dark suit, confident expression, standing pose, full body, clean white background, studio lighting"）
+
+【fixed_prompt 重要约束 — 定妆照规范】
+fixed_prompt 是用户复制到 AI 图片生成工具生成角色定妆照的 Prompt，必须满足以下要求：
+1. 姿态：必须为站立姿态（必须包含 "standing pose", "full body" 等关键词）
+2. 背景：必须为纯净背景（必须包含 "clean white background" 或 "solid color background, no scenery" 等关键词）
+3. 光照：推荐影棚光照（"studio lighting", "even lighting"）
+4. 禁止：不得包含任何场景描述、环境元素、动态姿势（如坐、蹲、跑、跳等）
 
 【重要 — 保护用户修改】
 如果提供了已有角色列表（含 stable_key），以下规则必须遵守：
@@ -231,6 +240,7 @@ const CHARACTER_SYSTEM_PROMPT = `你是一位专业的短剧角色设计师。�
     "fixed_prompt": "..."
   }
 ]`;
+}
 
 export async function generateCharacters(
   projectId: string,
@@ -239,6 +249,9 @@ export async function generateCharacters(
   ctx?: AIActionContext
 ): Promise<{ generated: number; updated: number }> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
+
+  // 0. 读取生成数量配置
+  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取故事数据（含元数据）
   const { data: story } = await supabase
@@ -282,7 +295,7 @@ export async function generateCharacters(
   userParts.push("\n请基于以上信息，生成角色列表。已有角色如需修改请用 operation=update + character_ref，新增角色用 operation=create。");
 
   const messages: ChatMessage[] = [
-    { role: "system", content: CHARACTER_SYSTEM_PROMPT },
+    { role: "system", content: buildCharacterSystemPrompt(genConfig) },
     { role: "user", content: userParts.join("\n") },
   ];
 
@@ -416,7 +429,8 @@ export async function generateCharacters(
 // 3. generateLocations — 场景生成（merge 模式）
 // ============================================
 
-const LOCATION_SYSTEM_PROMPT = `你是一位专业的短剧场景设计师。根据故事创意，生成 3-5 个核心场景。
+function buildLocationSystemPrompt(config: GenerationConfig): string {
+  return `你是一位专业的短剧场景设计师。根据故事创意，生成 ${config.location_count.min}-${config.location_count.max} 个核心场景。
 
 【语言要求】所有描述性字段（name/description/environment/time/weather/color_style）必须用中文输出，仅 fixed_prompt 用英文。
 
@@ -459,6 +473,7 @@ const LOCATION_SYSTEM_PROMPT = `你是一位专业的短剧场景设计师。根
     "fixed_prompt": "..."
   }
 ]`;
+}
 
 export async function generateLocations(
   projectId: string,
@@ -467,6 +482,9 @@ export async function generateLocations(
   ctx?: AIActionContext
 ): Promise<{ generated: number; updated: number }> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
+
+  // 0. 读取生成数量配置
+  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取故事数据
   const { data: story } = await supabase
@@ -507,7 +525,7 @@ export async function generateLocations(
   userParts.push("\n请基于以上信息，生成场景列表。已有场景如需修改请用 operation=update + location_ref，新增场景用 operation=create。");
 
   const messages: ChatMessage[] = [
-    { role: "system", content: LOCATION_SYSTEM_PROMPT },
+    { role: "system", content: buildLocationSystemPrompt(genConfig) },
     { role: "user", content: userParts.join("\n") },
   ];
 

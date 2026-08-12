@@ -6,6 +6,8 @@ import type {
   AIRequestConfig,
   AIResult,
   ChatMessage,
+  ImageGenerationRequest,
+  ImageGenerationResult,
   ProviderCapabilities,
 } from "./types";
 
@@ -28,4 +30,13 @@ export interface AIProvider {
    * @returns AI 调用结果
    */
   chat(messages: ChatMessage[], config?: AIRequestConfig): Promise<AIResult>;
+
+  /**
+   * 图片生成（可选实现）
+   * 不同 Provider 可选实现此方法以支持图生图功能
+   * @param request 图片生成请求（prompt + 参考图片）
+   * @param config 请求配置
+   * @returns 图片生成结果
+   */
+  generateImage?(request: ImageGenerationRequest, config?: AIRequestConfig): Promise<ImageGenerationResult>;
 }

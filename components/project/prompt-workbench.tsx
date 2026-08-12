@@ -20,6 +20,7 @@ import { StoryboardAssetCard } from "@/components/project/storyboard-asset-card"
 import { ContextPreviewDialog } from "@/components/project/context-preview";
 import { Collapse, CollapseTrigger, CollapseContent } from "@/components/ui/collapse";
 import { Upload, X, Loader2 } from "lucide-react";
+import type { StoryboardDocument } from "@/lib/storyboard/document-types";
 
 // ============================================
 // 类型定义
@@ -91,8 +92,9 @@ interface StoryboardRef {
   scene_id: string;
   status: string;
   version_number: number;
-  assistant_prompt: string | null;
-  storyboard_image: string | null;
+  document: StoryboardDocument | null;
+  storyboard_image_asset_id: string | null;
+  optimized_image_prompt: string | null;
   is_stale: boolean;
   stale_reason: string | null;
 }
@@ -100,7 +102,7 @@ interface StoryboardRef {
 interface StoryboardVersionRef {
   id: string;
   storyboard_id: string;
-  assistant_prompt: string;
+  document: StoryboardDocument;
   version_number: number;
   is_current: boolean;
   source: string;
@@ -491,6 +493,7 @@ function ShotImageCell({
 
 export function PromptWorkbench({
   projectId,
+  projectName = "",
   episodes,
   prompts: initialPrompts,
   activePromptTasks,
@@ -504,6 +507,7 @@ export function PromptWorkbench({
   assetUrls = {},
 }: {
   projectId: string;
+  projectName: string;
   episodes: Episode[] | null;
   prompts: Prompt[] | null;
   activePromptTasks: PromptTask[];
@@ -553,13 +557,6 @@ export function PromptWorkbench({
     setLocalShotAssets(prev => prev.filter(a => a.id !== assetId));
   }, []);
 
-  // 故事板图片变更
-  const handleStoryboardImageChange = useCallback((sceneId: string, url: string | null) => {
-    setLocalStoryboards(prev => prev.map(sb =>
-      sb.scene_id === sceneId ? { ...sb, storyboard_image: url } : sb
-    ));
-  }, []);
-
   const { isShotGenerating, isSceneGenerating, isPromptEvaluating, createPromptTask, createSceneTask, createPromptEvalTask } = usePromptTaskPolling({
     projectId,
     initialTasks: activePromptTasks,
@@ -567,11 +564,13 @@ export function PromptWorkbench({
       if (status === "success") {
         if (taskType === "generate_storyboard_asset") toast.success("Storyboard 生成成功");
         else if (taskType === "generate_scene_video_prompt") toast.success("场景视频 Prompt 生成成功");
+        else if (taskType === "generate_storyboard_image") toast.success("粗稿图片和优化提示词已生成");
         else if (taskType === "evaluate_prompt") toast.success("Prompt 质量评分完成");
         else toast.success("图片 Prompt 生成成功");
       } else {
         if (taskType === "generate_storyboard_asset") toast.error("Storyboard 生成失败");
         else if (taskType === "generate_scene_video_prompt") toast.error("场景视频 Prompt 生成失败");
+        else if (taskType === "generate_storyboard_image") toast.error("粗稿图片生成失败");
         else if (taskType === "evaluate_prompt") toast.error("质量评分失败");
         else toast.error("图片 Prompt 生成失败");
       }
@@ -945,7 +944,10 @@ export function PromptWorkbench({
                   const missingShotNums = (sc.shots || [])
                     .filter((s) => !shotAssetMap.has(s.id))
                     .map((s) => s.shot_number);
-                  const sceneReady = missingShotNums.length === 0 && (sc.shots || []).length > 0;
+                  // Storyboard 文档不依赖 shot_image，只要有镜头就 ready
+                  const storyboardReady = (sc.shots || []).length > 0;
+                  // Scene Video Prompt 硬依赖：① Storyboard Document 已生成(status='ready') ② 全部镜头已回传 shot_image
+                  const sceneReady = !!sb && sb.status === "ready" && missingShotNums.length === 0 && (sc.shots || []).length > 0;
       
                   // 构建图片依赖数据
                   const charIds = new Set<string>();
@@ -967,12 +969,37 @@ export function PromptWorkbench({
                     shot_number: sh.shot_number,
                   }));
       
-                  // 构建依赖图片缩略图列表（角色定妆照 + 场景参考图 + 镜头图片）
-                  const depImages: { url: string; label: string; kind: "character" | "location" | "shot" }[] = [
+                  // 构建依赖图片缩略图列表（角色定妆照 + 场景参考图 + 故事板优化图片 + 镜头图片）
+                  const docStoryboardImageUrl = sb?.storyboard_image_asset_id ? (localAssetUrls[sb.storyboard_image_asset_id] || null) : null;
+                  const depImages: { url: string; label: string; kind: "character" | "location" | "shot" | "storyboard" }[] = [
                     ...depChars.filter((c) => c.asset_id && localAssetUrls[c.asset_id!]).map((c) => ({ url: localAssetUrls[c.asset_id!]!, label: c.name, kind: "character" as const })),
                     ...depLocs.filter((l) => l.asset_id && localAssetUrls[l.asset_id!]).map((l) => ({ url: localAssetUrls[l.asset_id!]!, label: l.name, kind: "location" as const })),
+                    ...(docStoryboardImageUrl ? [{ url: docStoryboardImageUrl, label: "故事板", kind: "storyboard" as const }] : []),
                     ...depShots.filter((s) => s.asset_id && localAssetUrls[s.asset_id!]).map((s) => ({ url: localAssetUrls[s.asset_id!]!, label: `镜${s.shot_number}`, kind: "shot" as const })),
                   ];
+
+                  // 构建 Storyboard 文档预览数据
+                  const locRef = sc.location_id ? locationMap.get(sc.location_id) : null;
+                  const docCharacters: import("@/lib/storyboard/document-types").CharacterRef[] = Array.from(charIds).map(cid => {
+                    const c = characterMap.get(cid);
+                    const assetId = c?.portrait_asset_id;
+                    return {
+                      name: c?.name || "未知",
+                      role: null,
+                      portraitUrl: assetId && localAssetUrls[assetId] ? localAssetUrls[assetId] : null,
+                      description: "",
+                    };
+                  });
+                  const docLocationImageUrl = locRef?.reference_asset_id ? (localAssetUrls[locRef.reference_asset_id] || null) : null;
+                  const docFrameImages: Record<number, string> = {};
+                  for (const sh of sc.shots || []) {
+                    const assetId = shotAssetMap.get(sh.id);
+                    if (assetId && localAssetUrls[assetId]) {
+                      docFrameImages[sh.shot_number] = localAssetUrls[assetId];
+                    }
+                  }
+                  const docEpisodeTitle = `第 ${ep.episode_number} 集${ep.title ? " · " + ep.title : ""}`;
+                  const docLocationName = sc.location_name || locRef?.name || "";
 
                   return (
                     <div className="mt-3 space-y-2">
@@ -981,11 +1008,20 @@ export function PromptWorkbench({
                         sceneId={sc.id}
                         sceneNumber={sc.scene_number}
                         storyboard={sb ?? null}
+                        storyboardImageUrl={docStoryboardImageUrl}
                         storyboardVersions={sb ? (storyboardVersionsMap.get(sb.id) || []) : []}
                         missingShots={missingShotNums}
-                        ready={sceneReady}
+                        ready={storyboardReady}
                         isGenerating={isSceneGenerating(sc.id, "generate_storyboard_asset")}
+                        isImageGenerating={isSceneGenerating(sc.id, "generate_storyboard_image")}
                         onGenerate={() => handleGenerateStoryboard(sc.id)}
+                        projectName={projectName}
+                        episodeTitle={docEpisodeTitle}
+                        locationName={docLocationName}
+                        totalShots={(sc.shots || []).length}
+                        characters={docCharacters}
+                        locationImageUrl={docLocationImageUrl}
+                        frameImages={docFrameImages}
                         onSwitchVersion={sb ? (async (versionId: string) => {
                           try {
                             const res = await fetch(`/api/projects/${projectId}/storyboards/${sc.id}/versions`, {
@@ -1005,13 +1041,6 @@ export function PromptWorkbench({
                           }
                         }) : undefined}
                         dependencyImages={depImages}
-                        onImageChange={(url) => handleStoryboardImageChange(sc.id, url)}
-                        onPreviewContext={() => {
-                          setContextPreviewSceneId(sc.id);
-                          setContextPreviewShotId(null);
-                          setContextPreviewMode("storyboard");
-                          setShowContextPreview(true);
-                        }}
                       />
                       <SceneVideoPromptCard
                         sceneId={sc.id}
@@ -1028,7 +1057,6 @@ export function PromptWorkbench({
                         onEvaluate={() => svPrompt && handleEvaluatePrompt(svPrompt.id)}
                         onSwitchVersion={(versionId) => svPrompt && handleSwitchVersion(svPrompt.id, versionId)}
                         dependencyImages={depImages}
-                        storyboardImage={sb?.storyboard_image || null}
                         onPreviewContext={() => {
                           setContextPreviewSceneId(sc.id);
                           setContextPreviewShotId(null);

@@ -21,6 +21,7 @@ const ALLOWED_TASK_TYPES = [
   "generate_prompt",
   "generate_storyboard_asset",
   "generate_scene_video_prompt",
+  "generate_storyboard_image",
   "run_impact",
   "run_regen",
   "evaluate_prompt",
@@ -132,6 +133,10 @@ export async function POST(
       errorMessage = sceneId
         ? "该场景的视频 Prompt 正在生成中，请等待完成"
         : "场景视频 Prompt 正在生成中，请等待完成";
+    } else if (existing?.task_type === "generate_storyboard_image") {
+      errorMessage = sceneId
+        ? "该场景的故事板图片正在生成中，请等待完成"
+        : "故事板图片正在生成中，请等待完成";
     } else if (existing?.task_type === "generate_storyboard_episode") {
       errorMessage = `第 ${episodeNumber} 集分镜正在生成中，请等待完成`;
     }

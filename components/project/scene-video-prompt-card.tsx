@@ -10,7 +10,7 @@ import { toast } from "sonner";
 interface DependencyImage {
   url: string;
   label: string;
-  kind: "character" | "location" | "shot";
+  kind: "character" | "location" | "shot" | "storyboard";
 }
 
 // ============================================
@@ -55,7 +55,6 @@ interface SceneVideoPromptCardProps {
   onEvaluate?: () => void;
   onSwitchVersion?: (versionId: string) => void;
   dependencyImages?: DependencyImage[];
-  storyboardImage?: string | null;
   onPreviewContext?: () => void;
 }
 
@@ -78,7 +77,6 @@ export function SceneVideoPromptCard({
   onEvaluate,
   onSwitchVersion,
   dependencyImages = [],
-  storyboardImage = null,
   onPreviewContext,
 }: SceneVideoPromptCardProps) {
   const [switchingVersion, setSwitchingVersion] = useState<string | null>(null);
@@ -88,14 +86,11 @@ export function SceneVideoPromptCard({
   // 始终展示 is_current 版本（与评分器查询逻辑一致）
   const currentVersion = sceneVideoPrompt?.prompt_versions?.find((v) => v.is_current);
 
-  const hasStoryboardImage = !!storyboardImage;
-  const canGenerate = ready && storyboardStatus === "ready" && hasStoryboardImage;
+  const canGenerate = ready && storyboardStatus === "ready";
   const missingText = missingShots.length > 0
     ? `镜头 ${missingShots.join("、")} 未生成图片`
     : storyboardStatus !== "ready"
     ? `Storyboard 未就绪 (${storyboardStatus || "未生成"})`
-    : !hasStoryboardImage
-    ? "请先在上方上传故事板图片"
     : "";
 
   const handleGenerate = async () => {
@@ -171,26 +166,10 @@ export function SceneVideoPromptCard({
           </div>
         )}
 
-        {/* 故事板参考图（场景视频强依赖） */}
-        {hasStoryboardImage ? (
-          <div className="mb-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">故事板参考图（场景视频强依赖）</p>
-            <div className="relative group inline-block">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={storyboardImage!}
-                alt="故事板参考图"
-                onClick={() => setPreviewUrl(storyboardImage!)}
-                className="w-full max-w-xs aspect-video rounded-lg object-cover border cursor-pointer hover:opacity-80 transition-opacity"
-              />
-              <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5 rounded-b-lg">
-                场景 {sceneNumber} 故事板
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-xs text-amber-700 dark:text-amber-400">
-            ⚠️ 故事板图片未上传 — 场景视频 Prompt 生成需要故事板图片作为核心参考
+        {/* Storyboard Document 已就绪提示 */}
+        {storyboardStatus === "ready" && (
+          <div className="mb-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-2 text-xs text-green-700 dark:text-green-400">
+            ✓ Storyboard 文档已就绪，场景视频 Prompt 可基于文档内容生成
           </div>
         )}
 

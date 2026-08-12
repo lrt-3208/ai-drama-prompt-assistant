@@ -268,7 +268,6 @@ export function CharacterList({ projectId, initial, activeTask, assetUrls = {}, 
                   />
                 </div>
                 <div className="flex items-center gap-2 mb-1">
-                  <p className="text-xs text-muted-foreground font-mono">{c.stable_key}</p>
                   {versionMap[c.id] && <Badge variant="outline" className="text-[10px] h-4 px-1">v{versionMap[c.id]}</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{c.fixed_prompt}</p>

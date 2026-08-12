@@ -44,7 +44,7 @@ export default async function PromptsPage({
       .select("id, status, payload, task_type")
       .eq("project_id", id)
       .in("status", ["pending", "running"])
-      .in("task_type", ["generate_prompt", "generate_scene_video_prompt", "generate_storyboard_asset", "evaluate_prompt"])
+      .in("task_type", ["generate_prompt", "generate_scene_video_prompt", "generate_storyboard_asset", "generate_storyboard_image", "evaluate_prompt"])
       .order("created_at", { ascending: false }),
     supabase
       .from("characters")
@@ -63,16 +63,16 @@ export default async function PromptsPage({
       .eq("status", "active"),
     supabase
       .from("storyboards")
-      .select("id, scene_id, status, version_number, is_stale, stale_reason, assistant_prompt, storyboard_image")
+      .select("id, scene_id, status, version_number, is_stale, stale_reason, document, storyboard_image_asset_id, optimized_image_prompt")
       .eq("project_id", id),
     supabase
       .from("storyboard_versions")
-      .select("id, storyboard_id, assistant_prompt, version_number, is_current, source, ai_model")
+      .select("id, storyboard_id, document, version_number, is_current, source, ai_model")
       .eq("project_id", id)
       .order("version_number", { ascending: false }),
     supabase
       .from("projects")
-      .select("style_preset_id")
+      .select("style_preset_id, name")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -93,10 +93,11 @@ export default async function PromptsPage({
   const project = projectRes.data;
   const stylePresets = stylePresetsRes.data;
 
-  // 查询所有相关资产的 tos_key（角色定妆照 + 场景参考图）
+  // 查询所有相关资产的 tos_key（角色定妆照 + 场景参考图 + 故事板优化图片）
   const portraitAndRefIds = [
     ...(characters || []).map((c) => c.portrait_asset_id),
     ...(locations || []).map((l) => l.reference_asset_id),
+    ...(storyboards || []).map((sb) => sb.storyboard_image_asset_id),
   ].filter((id): id is string => !!id);
 
   const assetUrls: Record<string, string> = {};
@@ -155,6 +156,7 @@ export default async function PromptsPage({
       />
       <PromptWorkbench
         projectId={id}
+        projectName={project?.name || ""}
         episodes={episodes as never}
         prompts={prompts as never}
         activePromptTasks={(activePromptTasks || []) as never}

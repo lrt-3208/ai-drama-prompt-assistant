@@ -11,6 +11,7 @@ import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getGenerationConfig, type GenerationConfig } from "@/lib/ai-actions/config";
 
 /** DI 上下文（与 assets.ts 一致） */
 export interface AIActionContext {
@@ -47,15 +48,16 @@ export interface GeneratedStoryboard {
   }>;
 }
 
-/** 分镜生成的 system prompt */
-const STORYBOARD_SYSTEM_PROMPT = `你是一位专业的短剧分镜师。根据剧本内容，将故事拆解为分镜列表。
+/** 分镜生成的 system prompt（根据配置动态生成） */
+function buildStoryboardSystemPrompt(config: GenerationConfig): string {
+  return `你是一位专业的短剧分镜师。根据剧本内容，将故事拆解为分镜列表。
 
 【语言要求】所有字段内容（title/summary/description/action/emotion/environment/cinematography/dialogue/location_name/time/weather）必须用中文输出。
 
 要求：
-1. 生成 3-5 个剧集（episode），每集是一个独立的故事单元
-2. 每个剧集包含 2-5 个场景（scene）
-3. 每个场景包含 2-4 个镜头（shot）
+1. 生成 ${config.episode_count.min}-${config.episode_count.max} 个剧集（episode），每集是一个独立的故事单元
+2. 每个剧集包含 ${config.scenes_per_episode.min}-${config.scenes_per_episode.max} 个场景（scene）
+3. 每个场景包含 ${config.shots_per_scene.min}-${config.shots_per_scene.max} 个镜头（shot）
 4. 每个镜头包含：
    - shot_number: 镜头编号（在当前场景内从 1 开始）
    - description: 画面描述（镜头看到什么）
@@ -95,6 +97,7 @@ const STORYBOARD_SYSTEM_PROMPT = `你是一位专业的短剧分镜师。根据�
     }]
   }]
 }`;
+}
 
 /**
  * 生成分镜
@@ -108,6 +111,9 @@ export async function generateStoryboard(
   ctx?: AIActionContext
 ): Promise<GeneratedStoryboard> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
+
+  // 0. 读取生成数量配置
+  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取剧本数据
   const { data: script, error: scriptError } = await supabase
@@ -178,7 +184,7 @@ export async function generateStoryboard(
   );
 
   const messages: ChatMessage[] = [
-    { role: "system", content: STORYBOARD_SYSTEM_PROMPT },
+    { role: "system", content: buildStoryboardSystemPrompt(genConfig) },
     { role: "user", content: userParts.join("\n") },
   ];
 
@@ -333,15 +339,16 @@ export async function generateStoryboard(
 // 只传该集的 episode_outline，不传整个剧本
 // ============================================
 
-/** 单集分镜生成的 system prompt */
-const EPISODE_SYSTEM_PROMPT = `你是一位专业的短剧分镜师。根据提供的某一集剧情大纲，生成分镜列表。
+/** 单集分镜生成的 system prompt（根据配置动态生成） */
+function buildEpisodeSystemPrompt(config: GenerationConfig): string {
+  return `你是一位专业的短剧分镜师。根据提供的某一集剧情大纲，生成分镜列表。
 
 【语言要求】所有字段内容（title/summary/description/action/emotion/environment/cinematography/dialogue/location_name/time/weather）必须用中文输出。
 
 要求：
 1. 只生成指定的这一集，不要生成其他集
-2. 包含 2-5 个场景（scene）
-3. 每个场景包含 2-4 个镜头（shot）
+2. 包含 ${config.scenes_per_episode.min}-${config.scenes_per_episode.max} 个场景（scene）
+3. 每个场景包含 ${config.shots_per_scene.min}-${config.shots_per_scene.max} 个镜头（shot）
 4. 每个镜头包含：
    - shot_number: 镜头编号（在当前场景内从 1 开始）
    - description: 画面描述（镜头看到什么）
@@ -374,6 +381,7 @@ const EPISODE_SYSTEM_PROMPT = `你是一位专业的短剧分镜师。根据提�
     }]
   }]
 }`;
+}
 
 /** 单集 AI 生成结果 */
 interface GeneratedEpisode {
@@ -412,6 +420,9 @@ export async function generateEpisodeStoryboard(
   ctx?: AIActionContext
 ): Promise<GeneratedEpisode> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
+
+  // 0. 读取生成数量配置
+  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 0. 并发检查：episode.status === 'generating' → 抛 409
   const { data: existingEp } = await supabase
@@ -527,7 +538,7 @@ export async function generateEpisodeStoryboard(
     );
 
     const messages: ChatMessage[] = [
-      { role: "system", content: EPISODE_SYSTEM_PROMPT },
+      { role: "system", content: buildEpisodeSystemPrompt(genConfig) },
       { role: "user", content: userParts.join("\n") },
     ];
 

@@ -112,7 +112,7 @@ export const AIService = {
       {
         ...config,
         jsonMode: true,
-        temperature: config?.temperature ?? 0.3, // JSON 模式用低温度
+        temperature: config?.temperature ?? 0.3, // JSON 模式默认低温度，可被 config 覆盖
       },
       context,
       client
