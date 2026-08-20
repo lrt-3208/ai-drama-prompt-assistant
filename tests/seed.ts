@@ -101,6 +101,7 @@ async function main() {
         genre: proj.genre,
         status: "draft",
         asset_status: "draft",
+        generation_config: proj.generation_config || null,
       })
       .select("id, name")
       .single();
@@ -183,7 +184,7 @@ async function main() {
     const projectId = projectIdMap.get(vs.projectId);
     if (!projectId) continue;
 
-    const { error } = await supabase.from("visual_styles").insert({
+    const { data: vsRec, error } = await supabase.from("visual_styles").insert({
       project_id: projectId,
       name: vs.name,
       camera_style: vs.camera_style,
@@ -191,11 +192,14 @@ async function main() {
       lighting: vs.lighting,
       cinematography: vs.cinematography,
       fixed_prompt: vs.fixed_prompt,
-    });
+    }).select("id").single();
 
     if (error) {
       console.error(`  失败: ${vs.name} - ${error.message}`);
     } else {
+      // 回写 projects.visual_style_id（与 POST /api/projects/[id]/style 行为一致，
+      // 场景视频 Prompt 生成通过该外键关联查询视觉风格）
+      await supabase.from("projects").update({ visual_style_id: vsRec.id }).eq("id", projectId);
       console.log(`  ✓ [${vs.projectId}] ${vs.name}`);
     }
   }

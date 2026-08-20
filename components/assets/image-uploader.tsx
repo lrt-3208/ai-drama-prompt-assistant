@@ -168,19 +168,31 @@ export function ImageUploader({
           {/* 悬浮操作栏 */}
           <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-3 py-1.5 opacity-0 transition-opacity group-hover:opacity-100">
             <span className="text-xs text-white/80">点击图片预览</span>
-            <Button
-              variant="destructive"
-              size="xs"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <X className="size-3" />
-              )}
-              删除
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {/* 替换：重新上传会软删旧 asset 并把引用指向新图（上传 API 覆盖语义） */}
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+              >
+                <Upload className="size-3" />
+                替换
+              </Button>
+              <Button
+                variant="destructive"
+                size="xs"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <X className="size-3" />
+                )}
+                删除
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -107,6 +107,7 @@ export async function POST(
         characters: "pending",
         locations: "pending",
         style: "pending",
+        episodes: "pending",
       },
     })
     .select("id")

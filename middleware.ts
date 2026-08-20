@@ -13,6 +13,9 @@ export async function middleware(request: NextRequest) {
   if (!user && request.nextUrl.pathname.startsWith("/projects")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
+  if (!user && request.nextUrl.pathname.startsWith("/init")) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   // Redirect to dashboard if already logged in and visiting auth pages
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {

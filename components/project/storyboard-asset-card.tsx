@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, ImageIcon, ChevronDown, ChevronUp, Copy, FileText } from "lucide-react";
+import { Loader2, ChevronDown, ChevronUp, Copy } from "lucide-react";
 import type { StoryboardDocument, StoryboardRenderData, CharacterRef } from "@/lib/storyboard/document-types";
 import { StoryboardDocumentView } from "@/components/storyboard/document";
 import { useStoryboardScreenshot } from "@/hooks/use-storyboard-screenshot";
@@ -44,6 +42,7 @@ interface StoryboardAssetCardProps {
   sceneNumber: number;
   storyboard: StoryboardData | null;
   storyboardImageUrl?: string | null;
+  optimizedImageUrl?: string | null;
   storyboardVersions?: StoryboardVersion[];
   missingShots: number[];
   ready: boolean;
@@ -74,6 +73,7 @@ export function StoryboardAssetCard({
   sceneNumber,
   storyboard,
   storyboardImageUrl = null,
+  optimizedImageUrl = null,
   storyboardVersions = [],
   missingShots,
   ready,
@@ -98,6 +98,8 @@ export function StoryboardAssetCard({
   const [generatingImage, setGeneratingImage] = useState(false);
   const [showOptimizationPrompt, setShowOptimizationPrompt] = useState(false);
   const [showDocumentPreview, setShowDocumentPreview] = useState(false);
+  const [uploadingOptimized, setUploadingOptimized] = useState(false);
+  const optimizedInputRef = useRef<HTMLInputElement>(null);
 
   const status = storyboard?.status || null;
   const statusInfo = status ? STATUS_LABELS[status] : null;
@@ -178,6 +180,44 @@ export function StoryboardAssetCard({
     }
   }, [displayDocument, capture, projectId, sceneId, router]);
 
+  // 上传优化图：外部工具（Midjourney/Seedream 等）生成的整页优化分镜图回传
+  const handleOptimizedFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = ""; // 允许重复选择同一文件
+      if (!file) return;
+
+      setUploadingOptimized(true);
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("projectId", projectId);
+        fd.append("entityType", "storyboard");
+        fd.append("entityId", sceneId);
+        fd.append("assetType", "storyboard_image_optimized");
+
+        const res = await fetch("/api/assets/upload", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) {
+          // migration_v33 未执行时的典型报错：CHECK 约束拒绝 / 列不存在
+          const detail = data.detail || data.error || "";
+          if (detail.includes("optimized_image_asset_id") || detail.includes("check constraint")) {
+            throw new Error("数据库尚未支持优化图存储，请先在 Supabase 执行 supabase/migration_v33.sql");
+          }
+          throw new Error(data.error || "上传失败");
+        }
+
+        toast.success("优化图已上传");
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "上传失败");
+      } finally {
+        setUploadingOptimized(false);
+      }
+    },
+    [projectId, sceneId, router]
+  );
+
   // 构建渲染数据
   const renderData: StoryboardRenderData | null = displayDocument
     ? {
@@ -194,43 +234,58 @@ export function StoryboardAssetCard({
     : null;
 
   return (
-    <Card className={`border-l-4 ${storyboard?.is_stale ? "border-l-amber-500" : "border-l-indigo-500/40"}`}>
-      <CardContent className="pt-4">
+    <div
+      className={`bg-background/60 border rounded-lg p-3.5 ${
+        storyboard?.is_stale ? "border-stale/40" : "border-border"
+      }`}
+    >
+      <div>
         {/* 头部 */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">场景 {sceneNumber}</Badge>
-            <Badge variant="outline">🎬 Storyboard</Badge>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+              场景 {sceneNumber}
+            </span>
             {statusInfo && (
-              <Badge variant={statusInfo.variant} className="text-xs">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                  storyboard?.status === "ready"
+                    ? "bg-green-500/15 text-green-400 border-green-500/30"
+                    : "bg-surface2 text-muted-foreground border-border"
+                }`}
+              >
                 {statusInfo.text}
-              </Badge>
+              </span>
             )}
             {storyboard && (
-              <span className="text-xs text-muted-foreground">v{storyboard.version_number}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border font-mono">
+                v{storyboard.version_number}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             {storyboard?.is_stale && (
-              <Badge variant="outline" className="text-amber-500 border-amber-500/40">
-                ⚠️ 已过期
-              </Badge>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-stale/20 text-stale border border-stale/40">
+                ⚠ 已过期
+              </span>
             )}
           </div>
         </div>
 
         {/* 过期原因 */}
         {storyboard?.is_stale && storyboard?.stale_reason && (
-          <div className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-700 dark:text-amber-400">
+          <div className="mb-2.5 rounded bg-stale/10 border border-stale/25 p-2 text-[10px] text-stale">
             {storyboard.stale_reason}
           </div>
         )}
 
         {/* 依赖图片缩略图 */}
         {dependencyImages.length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">依赖图片（{dependencyImages.length} 张）</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="mb-2.5">
+            <p className="text-[9px] text-muted-foreground mb-1.5">
+              依赖图片（{dependencyImages.length} 张）
+            </p>
+            <div className="flex flex-wrap gap-1.5">
               {dependencyImages.map((img, i) => (
                 <div key={i} className="relative group flex-shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -238,11 +293,9 @@ export function StoryboardAssetCard({
                     src={img.url}
                     alt={img.label}
                     onClick={() => setDepPreviewUrl(img.url)}
-                    className="w-16 h-16 rounded-lg object-cover border cursor-pointer hover:opacity-80 transition-opacity"
+                    title={img.label}
+                    className="w-10 h-10 rounded object-cover border border-border cursor-pointer hover:border-primary/50 transition-colors"
                   />
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 rounded-b-lg truncate px-1">
-                    {img.label}
-                  </span>
                 </div>
               ))}
             </div>
@@ -289,53 +342,46 @@ export function StoryboardAssetCard({
               </div>
             )}
 
-            {/* 操作按钮 */}
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating || !canGenerate}>
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="size-3.5 mr-1 animate-spin" />
-                    生成文档中...
-                  </>
-                ) : (
-                  "重新生成文档"
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
+            {/* 操作按钮 — 原型小胶囊样式 */}
+            <div className="flex items-center gap-2 flex-wrap text-[9px]">
+              <button
                 onClick={() => setShowDocumentPreview(true)}
                 disabled={!displayDocument}
+                className="px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <FileText className="size-3.5 mr-1" />
-                预览文档
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
+                👁 预览文档
+              </button>
+              <button
                 onClick={handleGenerateImage}
                 disabled={generatingImage || isCapturing || isImageGenerating || !displayDocument}
+                className="px-2 py-0.5 rounded bg-surface2 border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {generatingImage || isCapturing || isImageGenerating ? (
-                  <>
-                    <Loader2 className="size-3.5 mr-1 animate-spin" />
-                    {isCapturing ? "截图中..." : "生成中..."}
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="size-3.5 mr-1" />
-                    {storyboardImageUrl ? "重新生成粗稿" : "生成粗稿图片"}
-                  </>
-                )}
-              </Button>
+                {generatingImage || isCapturing || isImageGenerating
+                  ? isCapturing
+                    ? "截图中..."
+                    : "生成中..."
+                  : storyboardImageUrl
+                  ? "⬇ 重新导出 PNG"
+                  : "⬇ 导出 PNG"}
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating || !canGenerate}
+                className="text-muted-foreground hover:text-primary transition ml-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isGenerating ? "⟳ 生成文档中..." : "⟳ 重新生成"}
+              </button>
+              <span className="text-muted-foreground/60 ml-auto hidden sm:inline">
+                HTML 渲染直出，1400px @2x
+              </span>
             </div>
 
             {/* 流程提示 */}
-            <p className="text-[10px] text-muted-foreground leading-relaxed">
-              粗稿图片 = 文档截图，配合下方优化提示词可在 Midjourney / Seedream 等工具中生成优化图片
+            <p className="text-[9px] text-muted-foreground leading-relaxed">
+              粗稿图片 = 文档截图；用粗稿 + 优化提示词在 Midjourney / Seedream 等工具生成优化图后，点击「上传优化图」回传
             </p>
 
-            {/* 粗稿图片 + 优化提示词 */}
+            {/* 粗稿图片 + 优化图 + 优化提示词 */}
             {storyboardImageUrl ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -351,6 +397,50 @@ export function StoryboardAssetCard({
                       粗稿
                     </span>
                   </div>
+                  {/* 优化图：外部生成后上传回传 */}
+                  {optimizedImageUrl ? (
+                    <div className="relative group flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={optimizedImageUrl}
+                        alt="故事板优化图片"
+                        onClick={() => setDepPreviewUrl(optimizedImageUrl)}
+                        className="w-16 h-16 rounded-lg object-cover border border-primary/40 cursor-pointer hover:opacity-80 transition-opacity"
+                      />
+                      <span className="absolute bottom-0 left-0 right-0 bg-primary/80 text-white text-[8px] text-center py-0.5 rounded-b-lg truncate px-1">
+                        优化
+                      </span>
+                      <button
+                        onClick={() => optimizedInputRef.current?.click()}
+                        title="替换优化图"
+                        disabled={uploadingOptimized}
+                        className="absolute top-1 right-1 hidden group-hover:flex items-center justify-center size-5 rounded bg-black/60 text-white text-[10px] hover:bg-black/80 transition disabled:opacity-50"
+                      >
+                        ⟳
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => optimizedInputRef.current?.click()}
+                      disabled={uploadingOptimized}
+                      title="上传在外部工具生成的优化分镜图"
+                      className="w-16 h-16 rounded-lg border border-dashed flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary/50 hover:text-primary transition text-[9px] disabled:opacity-50"
+                    >
+                      {uploadingOptimized ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <span className="text-base leading-none">⬆</span>
+                      )}
+                      {uploadingOptimized ? "上传中" : "上传优化图"}
+                    </button>
+                  )}
+                  <input
+                    ref={optimizedInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleOptimizedFileChange}
+                  />
                 </div>
                 {/* 优化提示词（可折叠 + 复制） */}
                 {storyboard?.optimized_image_prompt && (
@@ -386,7 +476,7 @@ export function StoryboardAssetCard({
               </div>
             ) : (
               <div className="rounded-lg bg-muted/20 border border-dashed p-3 text-center text-xs text-muted-foreground">
-                尚未生成粗稿图片，点击上方「生成粗稿图片」按钮
+                尚未导出粗稿图片（粗稿图片 = 整页文档截图），点击上方「⬇ 导出 PNG」按钮，自动生成粗稿图 + 优化提示词
               </div>
             )}
           </div>
@@ -414,7 +504,7 @@ export function StoryboardAssetCard({
             </Button>
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* 离屏渲染区域 — 供截图使用，用户不可见 */}
       {renderData && (
@@ -429,7 +519,23 @@ export function StoryboardAssetCard({
       {/* 文档预览 — 展示 Storyboard JSON 数据 */}
       <Dialog open={showDocumentPreview} onOpenChange={setShowDocumentPreview}>
         <DialogContent className="sm:max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogTitle className="sr-only">Storyboard 文档数据</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-sm font-medium">Storyboard 文档数据</DialogTitle>
+            {displayDocument && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(displayDocument, null, 2));
+                  toast.success("JSON 已复制到剪贴板");
+                }}
+              >
+                <Copy className="size-3 mr-1" />
+                复制 JSON
+              </Button>
+            )}
+          </div>
           {displayDocument && (
             <pre className="text-xs whitespace-pre-wrap break-words overflow-auto font-mono text-muted-foreground">
               {JSON.stringify(displayDocument, null, 2)}
@@ -448,6 +554,6 @@ export function StoryboardAssetCard({
           )}
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   );
 }

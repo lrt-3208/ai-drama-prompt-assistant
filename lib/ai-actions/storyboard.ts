@@ -11,7 +11,8 @@ import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getGenerationConfig, type GenerationConfig } from "@/lib/ai-actions/config";
+import { getRenderedSystemPrompt } from "@/lib/ai/node-template-loader";
+import * as Episodes from "@/lib/models/episodes";
 
 /** DI 上下文（与 assets.ts 一致） */
 export interface AIActionContext {
@@ -48,57 +49,6 @@ export interface GeneratedStoryboard {
   }>;
 }
 
-/** 分镜生成的 system prompt（根据配置动态生成） */
-function buildStoryboardSystemPrompt(config: GenerationConfig): string {
-  return `你是一位专业的短剧分镜师。根据剧本内容，将故事拆解为分镜列表。
-
-【语言要求】所有字段内容（title/summary/description/action/emotion/environment/cinematography/dialogue/location_name/time/weather）必须用中文输出。
-
-要求：
-1. 生成 ${config.episode_count.min}-${config.episode_count.max} 个剧集（episode），每集是一个独立的故事单元
-2. 每个剧集包含 ${config.scenes_per_episode.min}-${config.scenes_per_episode.max} 个场景（scene）
-3. 每个场景包含 ${config.shots_per_scene.min}-${config.shots_per_scene.max} 个镜头（shot）
-4. 每个镜头包含：
-   - shot_number: 镜头编号（在当前场景内从 1 开始）
-   - description: 画面描述（镜头看到什么）
-   - action: 角色动作描述
-   - emotion: 情绪表达
-   - environment: 环境细节
-   - cinematography: 摄影手法（如：特写、中景、全景、推镜、摇镜等）
-   - dialogue: 对白（如果没有对白则留空）
-   - character_names: 出场角色名字列表（必须使用已有角色名）
-
-剧集划分原则：
-- 每集有明确的核心冲突和高潮
-- 剧集之间有连贯性，前集结尾为后集铺垫
-- 第一集要抓人眼球，中间集推进剧情，最后一集收束
-
-请以 JSON 格式输出，不要输出任何其他内容。格式如下：
-{
-  "episodes": [{
-    "episode_number": 1,
-    "title": "...",
-    "summary": "...",
-    "scenes": [{
-      "scene_number": 1,
-      "location_name": "...",
-      "time": "...",
-      "weather": "...",
-      "shots": [{
-        "shot_number": 1,
-        "description": "...",
-        "action": "...",
-        "emotion": "...",
-        "environment": "...",
-        "cinematography": "...",
-        "dialogue": "...",
-        "character_names": ["角色名"]
-      }]
-    }]
-  }]
-}`;
-}
-
 /**
  * 生成分镜
  * @param projectId 项目 ID
@@ -111,9 +61,6 @@ export async function generateStoryboard(
   ctx?: AIActionContext
 ): Promise<GeneratedStoryboard> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
-
-  // 0. 读取生成数量配置
-  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取剧本数据
   const { data: script, error: scriptError } = await supabase
@@ -183,8 +130,10 @@ export async function generateStoryboard(
     "\n请基于以上剧本，生成详细的分镜列表。每个镜头要具体可执行。"
   );
 
+  // 5. 加载节点模板（数量变量由模板渲染注入；modeAware 节点按项目连载模式选模板）
+  const storyboardSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "storyboard");
   const messages: ChatMessage[] = [
-    { role: "system", content: buildStoryboardSystemPrompt(genConfig) },
+    { role: "system", content: storyboardSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 
@@ -197,11 +146,24 @@ export async function generateStoryboard(
     { supabase }
   );
 
-  // 6. 清理旧的分镜数据（删除旧 episodes 会级联删除 scenes 和 shots）
-  await supabase
+  // 6. 清理旧的分镜内容
+  //    只删 scenes（级联清理 shots / prompts / storyboards），保留 episodes 行 ——
+  //    episodes 承载剧情大纲(plot_outline)、分镜大纲(shot_outline)与各层版本号基线，
+  //    删掉会连带丢失剧情数据与过期判定依据。
+  const { data: oldEpisodes } = await supabase
     .from("episodes")
-    .delete()
+    .select("id")
     .eq("project_id", projectId);
+
+  if (oldEpisodes && oldEpisodes.length > 0) {
+    await supabase
+      .from("scenes")
+      .delete()
+      .in(
+        "episode_id",
+        oldEpisodes.map((e) => e.id)
+      );
+  }
 
   // 7. 构建角色名 → ID 的映射
   const charMap = new Map<string, string>();
@@ -222,22 +184,28 @@ export async function generateStoryboard(
   // 9. 保存到数据库
   const createdSceneIds: string[] = [];
   for (const ep of storyboard.episodes) {
-    // 插入 episode
+    // upsert episode（行可能已存在且带剧情大纲，不能 insert 覆盖）
     const { data: episode, error: epError } = await supabase
       .from("episodes")
-      .insert({
-        project_id: projectId,
-        episode_number: ep.episode_number,
-        title: ep.title,
-        summary: ep.summary,
-        status: "storyboarded",
-      })
+      .upsert(
+        {
+          project_id: projectId,
+          episode_number: ep.episode_number,
+          title: ep.title,
+          summary: ep.summary,
+          status: "storyboarded",
+        },
+        { onConflict: "project_id,episode_number" }
+      )
       .select("id")
       .single();
 
     if (epError || !episode) {
       throw new Error(`创建剧集失败: ${epError?.message}`);
     }
+
+    // 分镜内容已重建 → 递增 storyboard_version，使该集下游画面指令判定为过期
+    await Episodes.bumpStoryboardVersion(episode.id, { supabase });
 
     for (const sc of ep.scenes) {
       // 查找匹配的 location_id
@@ -339,50 +307,6 @@ export async function generateStoryboard(
 // 只传该集的 episode_outline，不传整个剧本
 // ============================================
 
-/** 单集分镜生成的 system prompt（根据配置动态生成） */
-function buildEpisodeSystemPrompt(config: GenerationConfig): string {
-  return `你是一位专业的短剧分镜师。根据提供的某一集剧情大纲，生成分镜列表。
-
-【语言要求】所有字段内容（title/summary/description/action/emotion/environment/cinematography/dialogue/location_name/time/weather）必须用中文输出。
-
-要求：
-1. 只生成指定的这一集，不要生成其他集
-2. 包含 ${config.scenes_per_episode.min}-${config.scenes_per_episode.max} 个场景（scene）
-3. 每个场景包含 ${config.shots_per_scene.min}-${config.shots_per_scene.max} 个镜头（shot）
-4. 每个镜头包含：
-   - shot_number: 镜头编号（在当前场景内从 1 开始）
-   - description: 画面描述（镜头看到什么）
-   - action: 角色动作描述
-   - emotion: 情绪表达
-   - environment: 环境细节
-   - cinematography: 摄影手法（如：特写、中景、全景、推镜、摇镜等）
-   - dialogue: 对白（如果没有对白则留空）
-   - character_names: 出场角色名字列表（必须使用已有角色名）
-
-请以 JSON 格式输出，不要输出任何其他内容。格式如下：
-{
-  "episode_number": 1,
-  "title": "...",
-  "summary": "...",
-  "scenes": [{
-    "scene_number": 1,
-    "location_name": "...",
-    "time": "...",
-    "weather": "...",
-    "shots": [{
-      "shot_number": 1,
-      "description": "...",
-      "action": "...",
-      "emotion": "...",
-      "environment": "...",
-      "cinematography": "...",
-      "dialogue": "...",
-      "character_names": ["角色名"]
-    }]
-  }]
-}`;
-}
-
 /** 单集 AI 生成结果 */
 interface GeneratedEpisode {
   episode_number: number;
@@ -421,9 +345,6 @@ export async function generateEpisodeStoryboard(
 ): Promise<GeneratedEpisode> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
 
-  // 0. 读取生成数量配置
-  const genConfig = await getGenerationConfig(projectId, { supabase });
-
   // 0. 并发检查：episode.status === 'generating' → 抛 409
   const { data: existingEp } = await supabase
     .from("episodes")
@@ -436,29 +357,51 @@ export async function generateEpisodeStoryboard(
     throw new Error("409:该集正在生成中，请稍候");
   }
 
-  // 1. 读取剧本数据
-  const { data: script, error: scriptError } = await supabase
-    .from("scripts")
-    .select("synopsis, genre, relationships, worldview, characters, episode_outline")
-    .eq("project_id", projectId)
-    .single();
+  // 1. 读取整体背景（供 AI 参考世界观/角色关系）
+  //    优先 stories（初始化故事创意，新架构权威数据源），兼容回退 scripts（旧链路数据）
+  const [scriptRes, storyRes] = await Promise.all([
+    supabase
+      .from("scripts")
+      .select("synopsis, genre, relationships, worldview, characters")
+      .eq("project_id", projectId)
+      .maybeSingle(),
+    supabase
+      .from("stories")
+      .select("raw_input, theme, genre, core_conflict, target_emotion")
+      .eq("project_id", projectId)
+      .maybeSingle(),
+  ]);
+  const script = scriptRes.data;
+  const story = storyRes.data;
 
-  if (scriptError || !script) {
-    throw new Error("请先生成剧本后再按集生成分镜");
+  // 2. 严格依赖校验：分镜内容必须基于该集分镜大纲（episodes.shot_outline）生成
+  //    依赖链：剧情大纲(plot_outline) → 分镜大纲(shot_outline) → 分镜内容(scenes/shots)
+  //    不再回退 scripts.episode_outline / plot_outline，避免绕过前置依赖
+  if (!existingEp) {
+    throw new Error(`第 ${episodeNumber} 集不存在，请先完成项目初始化`);
   }
 
-  // 2. 提取该集 episode_outline
-  const episodeOutlines = Array.isArray(script.episode_outline)
-    ? script.episode_outline
-    : [];
-
-  const epOutline = episodeOutlines.find(
-    (e: { episode: number }) => e.episode === episodeNumber
-  );
-
-  if (!epOutline) {
-    throw new Error(`剧本中没有第 ${episodeNumber} 集的大纲，请重新生成剧本`);
+  const epRow = await Episodes.getByNumber(projectId, episodeNumber, { supabase });
+  if (!epRow?.shot_outline?.scenes?.length) {
+    throw new Error(`第 ${episodeNumber} 集分镜大纲未生成，请先在剧本 Tab 生成分镜大纲`);
   }
+
+  // 有结构化分镜大纲 → 序列化为文本大纲喂给分镜生成
+  const scenesText = epRow.shot_outline.scenes
+    .map((s) => {
+      const bits = [`场景${s.scene_number}${s.title ? ` ${s.title}` : ""}`];
+      if (s.location) bits.push(`地点:${s.location}`);
+      if (s.emotion) bits.push(`情绪:${s.emotion}`);
+      if (s.shot_count_estimate) bits.push(`约${s.shot_count_estimate}镜`);
+      if (s.key_shots?.length) bits.push(`重点:${s.key_shots.join("、")}`);
+      return bits.join(" · ");
+    })
+    .join("\n");
+  const epOutline = {
+    episode: episodeNumber,
+    title: epRow.title || `第 ${episodeNumber} 集`,
+    outline: scenesText,
+  };
 
   // 3. 读取角色资产
   const { data: characters } = await supabase
@@ -473,47 +416,34 @@ export async function generateEpisodeStoryboard(
     .eq("project_id", projectId);
 
   // 5. episode.status = 'generating'（乐观锁）
-  // 对于不存在的 episode（待生成集），先创建一条 generating 记录
-  let episodeId: string;
-  if (existingEp?.id) {
-    await supabase
-      .from("episodes")
-      .update({ status: "generating" })
-      .eq("id", existingEp.id);
-    episodeId = existingEp.id;
-  } else {
-    const { data: placeholderEp, error: placeholderError } = await supabase
-      .from("episodes")
-      .insert({
-        project_id: projectId,
-        episode_number: episodeNumber,
-        title: epOutline.title,
-        summary: epOutline.outline,
-        status: "generating",
-      })
-      .select("id")
-      .single();
-
-    if (placeholderError || !placeholderEp) {
-      throw new Error(`创建剧集记录失败: ${placeholderError?.message}`);
-    }
-    episodeId = placeholderEp.id;
-  }
+  //    严格依赖校验后 episode 骨架必已存在（初始化时创建），不再有 placeholder 创建分支
+  const episodeId = existingEp.id;
+  await supabase
+    .from("episodes")
+    .update({ status: "generating" })
+    .eq("id", episodeId);
 
   try {
     // 6. 构建 user prompt（只传该集大纲，不传整个剧本）
     const userParts: string[] = [];
 
     userParts.push("【剧本背景（简略）】");
-    userParts.push(`类型: ${script.genre || ""}`);
-    if (script.worldview) userParts.push(`世界观: ${script.worldview}`);
-    if (script.relationships) userParts.push(`角色关系: ${script.relationships}`);
+    if (script?.synopsis) userParts.push(`故事梗概: ${script.synopsis}`);
+    const genreText = script?.genre || story?.genre;
+    if (genreText) userParts.push(`类型: ${genreText}`);
+    if (script?.worldview) {
+      userParts.push(`世界观: ${script.worldview}`);
+    } else if (story?.raw_input) {
+      userParts.push(`原始创意: ${story.raw_input}`);
+    }
+    if (story?.theme && !script?.synopsis) userParts.push(`题材: ${story.theme}`);
+    if (script?.relationships) userParts.push(`角色关系: ${script.relationships}`);
 
     userParts.push(`\n【第 ${episodeNumber} 集大纲】`);
     userParts.push(`集标题: ${epOutline.title}`);
     userParts.push(`剧情大纲: ${epOutline.outline}`);
 
-    if (script.characters) {
+    if (script?.characters) {
       const chars = Array.isArray(script.characters)
         ? script.characters
         : JSON.parse(script.characters as string);
@@ -537,8 +467,12 @@ export async function generateEpisodeStoryboard(
       `\n请基于以上信息，只生成第 ${episodeNumber} 集《${epOutline.title}》的分镜列表。`
     );
 
+    // 6.5 加载节点模板（数量变量由模板渲染注入；&episode_number 传当前集数）
+    const episodeSystemPrompt = await getRenderedSystemPrompt(
+      supabase, userId, projectId, "storyboard_episode", { episodeNumber }
+    );
     const messages: ChatMessage[] = [
-      { role: "system", content: buildEpisodeSystemPrompt(genConfig) },
+      { role: "system", content: episodeSystemPrompt },
       { role: "user", content: userParts.join("\n") },
     ];
 
@@ -564,12 +498,11 @@ export async function generateEpisodeStoryboard(
       for (const l of locations) locMap.set(l.name, l.id);
     }
 
-    // 10. 更新 episode 记录（用 AI 生成结果覆盖，不再删除重插）
+    // 10. 更新 episode 状态 —— 只写 status，不反向覆盖 title/summary
+    //     （依赖链方向：剧情大纲是 title/summary 的权威产出层，分镜只消费、不回写）
     const { error: epError } = await supabase
       .from("episodes")
       .update({
-        title: episode.title,
-        summary: episode.summary,
         status: "storyboarded",
       })
       .eq("id", episodeId);
@@ -577,6 +510,10 @@ export async function generateEpisodeStoryboard(
     if (epError) {
       throw new Error(`更新剧集失败: ${epError.message}`);
     }
+
+    // 分镜内容已重建 → 递增 storyboard_version，
+    // 使该集下游画面指令在前端判定为「需重新生成」（旧 prompts 已随 scenes 级联删除）
+    await Episodes.bumpStoryboardVersion(episodeId, { supabase });
 
     const createdSceneIds: string[] = [];
 

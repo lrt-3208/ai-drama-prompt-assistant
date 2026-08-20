@@ -9,6 +9,7 @@ import { createClient } from "@/utils/supabase/server";
 import { AIService } from "@/lib/ai/ai-service";
 import type { ChatMessage } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
+import { getRenderedSystemPrompt } from "@/lib/ai/node-template-loader";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** DI 上下文 */
@@ -30,35 +31,6 @@ export interface VisualSpec {
   spec_name: string;
   spec_prompt: string;
 }
-
-const VISUAL_SPECS_SYSTEM_PROMPT = `你是一位专业的 AI 角色视觉设计师。请根据角色信息，生成 4 类视觉规范，每类一条 Prompt。
-
-【4 类规范】
-1. appearance（外貌）：角色的面部特征、发型、体型等外貌描述。必须包含 "standing pose" 和 "full body" 姿态关键词。
-2. expression（表情）：角色的典型表情和情绪表现。必须包含 "facing camera" 正面朝向关键词。
-3. costume（服装）：角色的服装风格和配饰。
-4. camera_reference（摄影参考）：推荐的角度、构图和光影参考。必须包含 "clean white background" 和 "studio lighting" 关键词，禁止包含任何场景或环境元素。
-
-【定妆照约束 — 适用于所有规范】
-- 姿态：必须为站立姿态（standing pose），禁止坐、蹲、跑、跳等动态姿势
-- 背景：必须为纯净背景（clean white background / solid color background），禁止任何场景、环境、道具元素
-- 光照：推荐影棚光照（studio lighting, even lighting）
-- 构图：全身或半身正面肖像（full body portrait, facing camera）
-
-【要求】
-- 每条 Prompt 应包含足够细节，可直接用于 AI 图片生成
-- 使用英文输出（兼容主流 AI 图片模型）
-- 每条 Prompt 应包含足够细节以确保 AI 图片生成质量，不设字数上限
-
-请以 JSON 格式输出，不要输出任何其他内容：
-{
-  "specs": [
-    { "spec_type": "appearance", "spec_name": "角色外貌", "spec_prompt": "..." },
-    { "spec_type": "expression", "spec_name": "角色表情", "spec_prompt": "..." },
-    { "spec_type": "costume", "spec_name": "角色服装", "spec_prompt": "..." },
-    { "spec_type": "camera_reference", "spec_name": "摄影参考", "spec_prompt": "..." }
-  ]
-}`;
 
 /**
  * 为角色生成视觉规范（4 类）
@@ -91,8 +63,12 @@ export async function generateVisualSpecs(
 服装：${character.clothing || "未指定"}
 fixed_prompt：${character.fixed_prompt || "未指定"}`;
 
+  // 加载节点模板（正文在 node-registry: visual_specs）
+  const specsSystemPrompt = await getRenderedSystemPrompt(
+    supabase, userId, character.project_id, "visual_specs"
+  );
   const messages: ChatMessage[] = [
-    { role: "system", content: VISUAL_SPECS_SYSTEM_PROMPT },
+    { role: "system", content: specsSystemPrompt },
     { role: "user", content: userContent },
   ];
 

@@ -51,6 +51,13 @@ export async function PATCH(
   if (body.status !== undefined) updateData.status = body.status;
   if (body.cover_url !== undefined) updateData.cover_url = body.cover_url;
   if (body.style_preset_id !== undefined) updateData.style_preset_id = body.style_preset_id;
+  if (body.serialization_mode !== undefined) {
+    const modes = ["continuous", "episodic", "mixed"];
+    if (!modes.includes(body.serialization_mode)) {
+      return NextResponse.json({ error: "无效的连载模式" }, { status: 400 });
+    }
+    updateData.serialization_mode = body.serialization_mode;
+  }
   if (body.generation_config !== undefined) updateData.generation_config = body.generation_config || null;
 
   const { data, error } = await supabase

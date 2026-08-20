@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Cpu, ScrollText, LogOut } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface DashboardNavProps {
   userEmail: string;
@@ -22,6 +30,9 @@ export function DashboardNav({ userEmail, nickname }: DashboardNavProps) {
     router.refresh();
   };
 
+  // 头像取昵称（或邮箱）首字
+  const avatarChar = (nickname || userEmail || "?").trim().charAt(0).toUpperCase();
+
   return (
     <header className="border-b bg-background">
       <div className="container mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
@@ -29,19 +40,34 @@ export function DashboardNav({ userEmail, nickname }: DashboardNavProps) {
           <Link href="/dashboard" className="text-lg font-bold">
             AI 短剧 Prompt 助手
           </Link>
-          <Link
-            href="/settings/ai-models"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="打开用户菜单"
           >
-            AI 模型
-          </Link>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground">{nickname} · {userEmail}</span>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            退出
-          </Button>
-        </div>
+            {avatarChar}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="truncate">
+              {nickname} · {userEmail}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/settings/ai-models")}>
+              <Cpu />
+              AI 模型配置
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings/prompts")}>
+              <ScrollText />
+              提示词配置
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+              <LogOut />
+              退出登录
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

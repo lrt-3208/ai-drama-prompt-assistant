@@ -64,6 +64,7 @@ export async function POST(
     lighting: body.lighting?.trim() || null,
     cinematography: body.cinematography?.trim() || null,
     fixed_prompt: body.fixed_prompt.trim(),
+    negative_prompt: body.negative_prompt?.trim() || null,
   };
 
   if (!existing) {

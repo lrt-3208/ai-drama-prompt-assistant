@@ -11,7 +11,7 @@ import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import * as Storyboards from "@/lib/models/storyboards";
-import { STORYBOARD_DOCUMENT_SYSTEM_PROMPT } from "./document-prompt";
+import { getRenderedSystemPrompt } from "@/lib/ai/node-template-loader";
 import type { StoryboardDocument } from "./document-types";
 
 /** DI 上下文 */
@@ -172,8 +172,10 @@ export async function generateStoryboardDocument(
 
   userParts.push(`\n请基于以上完整信息，生成结构化的场景视觉规划文档。frames 数组必须包含 ${shots.length} 个镜头帧，emotion_curve 必须包含 ${shots.length} 个数据点。只输出 JSON，不要输出其他内容。`);
 
+  // 加载节点模板（正文已迁入 node-registry: storyboard_document）
+  const documentSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "storyboard_document");
   const messages: ChatMessage[] = [
-    { role: "system", content: STORYBOARD_DOCUMENT_SYSTEM_PROMPT },
+    { role: "system", content: documentSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 

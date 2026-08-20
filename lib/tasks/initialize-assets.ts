@@ -10,6 +10,8 @@ import {
   generateStyle,
   type AIActionContext,
 } from "@/lib/ai-actions/assets";
+import { getGenerationConfig } from "@/lib/ai-actions/config";
+import * as Episodes from "@/lib/models/episodes";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import {
   lockTask,
@@ -23,9 +25,12 @@ import {
  * 流程：
  * 1. 原子锁定（lock_project_task RPC）
  * 2. 第一阶段：enrichStory（串行）
- * 3. 第二阶段：Promise.allSettled(characters, locations, style)
+ * 3. 第二阶段：Promise.allSettled(characters, locations, style, episodes 骨架)
  * 4. 更新最终状态 + progress + error
  * 5. 同步 projects.asset_status
+ *
+ * Episode 骨架为纯 DB 操作（无 AI 调用），按 generation_config.episode_count.max
+ * 创建空壳集（仅集号 + draft 状态），对照原型 02-init.html 第 5 步。
  *
  * 僵尸回收由 task-runner 在调用前执行（见 task-runner/route.ts）
  * heartbeat 每 30s 更新 locked_at
@@ -59,6 +64,7 @@ export async function executeInitializeTask(
     characters: { ok: false },
     locations: { ok: false },
     style: { ok: false },
+    episodes: { ok: false },
   };
 
   // 初始化 progress
@@ -67,6 +73,7 @@ export async function executeInitializeTask(
     characters: "pending",
     locations: "pending",
     style: "pending",
+    episodes: "pending",
   });
 
   // 启动 heartbeat（每 30s）
@@ -90,10 +97,25 @@ export async function executeInitializeTask(
 
     // 3. 第二阶段：并行（仅 story 成功时）
     if (results.story.ok) {
-      const [charR, locR, styleR] = await Promise.allSettled([
+      await updateProgress(supabase, taskId, {
+        characters: "running",
+        locations: "running",
+        style: "running",
+        episodes: "running",
+      });
+
+      // Episode 骨架数取生成配置的上限值（纯 DB 操作，无 AI 调用）
+      const genConfig = await getGenerationConfig(task.project_id, { supabase });
+
+      const [charR, locR, styleR, epR] = await Promise.allSettled([
         generateCharacters(task.project_id, task.user_id, undefined, ctx),
         generateLocations(task.project_id, task.user_id, undefined, ctx),
         generateStyle(task.project_id, task.user_id, undefined, ctx),
+        Episodes.ensureSkeletons(
+          task.project_id,
+          genConfig.episode_count.max,
+          { supabase }
+        ),
       ]);
 
       results.characters = charR.status === "fulfilled"
@@ -108,11 +130,16 @@ export async function executeInitializeTask(
         ? { ok: true }
         : { ok: false, error: (styleR.reason as Error)?.message || "风格生成失败" };
 
+      results.episodes = epR.status === "fulfilled"
+        ? { ok: true }
+        : { ok: false, error: (epR.reason as Error)?.message || "Episode 骨架创建失败" };
+
       // 更新 progress（merge，不覆盖 story）
       await updateProgress(supabase, taskId, {
         characters: results.characters.ok ? "success" : "failed",
         locations: results.locations.ok ? "success" : "failed",
         style: results.style.ok ? "success" : "failed",
+        episodes: results.episodes.ok ? "success" : "failed",
       });
     }
   } finally {
@@ -135,7 +162,7 @@ export async function executeInitializeTask(
   // 4. 最终状态
   const successCount = Object.values(results).filter((r) => r.ok).length;
   const finalStatus =
-    successCount === 4 ? "success" : successCount > 0 ? "partial" : "failed";
+    successCount === 5 ? "success" : successCount > 0 ? "partial" : "failed";
 
   const errors: Record<string, string> = {};
   for (const [k, v] of Object.entries(results)) {
@@ -150,7 +177,7 @@ export async function executeInitializeTask(
   await supabase.from("project_tasks").update({
     status: finalStatus,
     error: Object.keys(errors).length > 0 ? errors : null,
-    result: { successCount, totalCount: 4 },
+    result: { successCount, totalCount: 5 },
     completed_at: new Date().toISOString(),
   }).eq("id", taskId);
 

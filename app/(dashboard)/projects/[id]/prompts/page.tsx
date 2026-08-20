@@ -28,7 +28,7 @@ export default async function PromptsPage({
   ] = await Promise.all([
     supabase
       .from("episodes")
-      .select("id, episode_number, title, summary, scenes(id, scene_number, location_name, location_id, time, shots(id, shot_number, description, shot_characters(character_id)))")
+      .select("id, episode_number, title, summary, storyboard_version, storyboard_updated_at, scenes(id, scene_number, location_name, location_id, time, video_url, shots(id, shot_number, description, shot_characters(character_id)))")
       .eq("project_id", id)
       .order("episode_number")
       .order("scene_number", { referencedTable: "scenes", ascending: true })
@@ -63,7 +63,7 @@ export default async function PromptsPage({
       .eq("status", "active"),
     supabase
       .from("storyboards")
-      .select("id, scene_id, status, version_number, is_stale, stale_reason, document, storyboard_image_asset_id, optimized_image_prompt")
+      .select("id, scene_id, status, version_number, is_stale, stale_reason, document, storyboard_image_asset_id, optimized_image_asset_id, optimized_image_prompt")
       .eq("project_id", id),
     supabase
       .from("storyboard_versions")
@@ -93,11 +93,12 @@ export default async function PromptsPage({
   const project = projectRes.data;
   const stylePresets = stylePresetsRes.data;
 
-  // 查询所有相关资产的 tos_key（角色定妆照 + 场景参考图 + 故事板优化图片）
+  // 查询所有相关资产的 tos_key（角色定妆照 + 场景参考图 + 故事板粗稿/优化图片）
   const portraitAndRefIds = [
     ...(characters || []).map((c) => c.portrait_asset_id),
     ...(locations || []).map((l) => l.reference_asset_id),
     ...(storyboards || []).map((sb) => sb.storyboard_image_asset_id),
+    ...(storyboards || []).map((sb) => sb.optimized_image_asset_id),
   ].filter((id): id is string => !!id);
 
   const assetUrls: Record<string, string> = {};

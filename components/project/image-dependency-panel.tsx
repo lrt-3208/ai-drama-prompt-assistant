@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PreviewableImage } from "@/components/ui/previewable-image";
 
 // ============================================
 // 类型定义
@@ -35,11 +36,11 @@ function AssetImage({ url, label }: { url?: string; label: string }) {
 
   return (
     <div className="relative group">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <PreviewableImage
         src={url}
         alt={label}
         className="w-20 h-20 rounded-lg object-cover border border-border"
+        previewCaption={label}
       />
       <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] px-1 py-0.5 rounded-b-lg truncate">
         {label}

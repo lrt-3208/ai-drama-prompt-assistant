@@ -24,7 +24,9 @@ export type ImpactEntityType =
   | "location"
   | "visual_style"
   | "storyboard"
-  | "template";
+  | "template"
+  | "episode_plot"
+  | "episode_outline";
 
 /** 影响传播 payload（存储在 project_tasks.progress 中） */
 export interface ImpactPayload {
@@ -62,6 +64,9 @@ export async function runImpact(
       return handleStoryboardImpact(payload, supabase);
     case "template":
       return handleTemplateImpact(payload, supabase);
+    case "episode_plot":
+    case "episode_outline":
+      return handleEpisodeImpact(payload, supabase);
     default:
       return { stalePrompts: 0, staleStoryboards: 0, details: [] };
   }
@@ -372,6 +377,114 @@ async function handleTemplateImpact(
       result.stalePrompts += finalIds.length;
       result.details.push(`模板变更：${finalIds.length} 个 Prompt 标记过期`);
     }
+  }
+
+  return result;
+}
+
+// ============================================
+// Episode 剧情/分镜大纲变更影响
+//
+// episode_plot 变更（plot_version +1）：
+//   → 该集分镜大纲「上游脏」（由 episodes.*_based_on_* 版本基线在前端展示）
+//   → 该集已生成的分镜内容（scenes/shots）下游过期：storyboards + 画面指令 prompts 标 stale
+// episode_outline 变更（outline_version +1）：
+//   → 该集分镜内容下游过期：同上
+//
+// 说明：大纲变更时分镜内容仍然存在（未删除重建），因此用 is_stale 标记；
+//       版本基线字段（outline_based_on_plot_version 等）由生成动作写入，此处只做下游 stale 传播。
+// ============================================
+
+async function handleEpisodeImpact(
+  payload: ImpactPayload,
+  supabase: SupabaseClient
+): Promise<ImpactResult> {
+  const result: ImpactResult = { stalePrompts: 0, staleStoryboards: 0, details: [] };
+  const episodeId = payload.entity_id;
+  const layer = payload.entity_type === "episode_plot" ? "剧情大纲" : "分镜大纲";
+
+  // 时序防护：impact 是异步任务，实际执行时下游可能已基于新版本重建。
+  // 比对版本基线，若变更已被下游吸收则跳过，避免误标刚重建的分镜/指令。
+  const { data: ep } = await supabase
+    .from("episodes")
+    .select(
+      "plot_version, outline_version, outline_based_on_plot_version, storyboard_based_on_outline_version"
+    )
+    .eq("id", episodeId)
+    .single();
+  if (ep) {
+    if (
+      payload.entity_type === "episode_plot" &&
+      ep.outline_based_on_plot_version != null &&
+      ep.outline_based_on_plot_version >= ep.plot_version
+    ) {
+      // 分镜大纲已基于当前剧情版本生成 → 本次剧情变更已被吸收
+      result.details.push(`${layer}变更已被分镜大纲吸收（v${ep.outline_based_on_plot_version}），跳过标脏`);
+      return result;
+    }
+    if (
+      payload.entity_type === "episode_outline" &&
+      ep.storyboard_based_on_outline_version != null &&
+      ep.storyboard_based_on_outline_version >= ep.outline_version
+    ) {
+      // 分镜内容已基于当前大纲版本生成 → 本次大纲变更已被吸收
+      result.details.push(`${layer}变更已被分镜内容吸收（v${ep.storyboard_based_on_outline_version}），跳过标脏`);
+      return result;
+    }
+  }
+
+  // 该集所有场景
+  const { data: scenes } = await supabase
+    .from("scenes")
+    .select("id")
+    .eq("episode_id", episodeId);
+
+  const sceneIds = (scenes || []).map((s) => s.id);
+  if (sceneIds.length === 0) {
+    // 尚无分镜内容，无下游可传播（分镜大纲/分镜内容将在生成时基于新版本）
+    return result;
+  }
+
+  const reason = `本集${layer}已更新，分镜内容需重新生成`;
+
+  // 1. 该集所有 storyboards 标 stale
+  const { data: staleSbs } = await supabase
+    .from("storyboards")
+    .update({ is_stale: true, stale_reason: reason })
+    .in("scene_id", sceneIds)
+    .eq("is_stale", false)
+    .select("id");
+  result.staleStoryboards += (staleSbs || []).length;
+
+  // 2. 该集所有 Scene Video Prompt（scene_id 命中）标 stale
+  const { data: staleScenePrompts } = await supabase
+    .from("prompts")
+    .update({ is_stale: true, stale_reason: reason })
+    .in("scene_id", sceneIds)
+    .eq("is_stale", false)
+    .select("id");
+  result.stalePrompts += (staleScenePrompts || []).length;
+
+  // 3. 该集所有镜头的 Image Prompt（shot_id 命中）标 stale
+  const { data: shots } = await supabase
+    .from("shots")
+    .select("id")
+    .in("scene_id", sceneIds);
+  const shotIds = (shots || []).map((s) => s.id);
+  if (shotIds.length > 0) {
+    const { data: staleShotPrompts } = await supabase
+      .from("prompts")
+      .update({ is_stale: true, stale_reason: reason })
+      .in("shot_id", shotIds)
+      .eq("is_stale", false)
+      .select("id");
+    result.stalePrompts += (staleShotPrompts || []).length;
+  }
+
+  if (result.staleStoryboards > 0 || result.stalePrompts > 0) {
+    result.details.push(
+      `${layer}变更：${result.staleStoryboards} 个 Storyboard、${result.stalePrompts} 个 Prompt 标记过期`
+    );
   }
 
   return result;

@@ -203,6 +203,7 @@ export async function POST(request: NextRequest) {
  * 更新实体表的 asset 关联字段
  * character_portrait → characters.portrait_asset_id
  * location_reference → locations.reference_asset_id
+ * storyboard_image_optimized → storyboards.optimized_image_asset_id（按 scene_id 关联）
  */
 async function updateEntityAssetRef(
   supabase: ReturnType<typeof createClient>,
@@ -214,11 +215,13 @@ async function updateEntityAssetRef(
   const columnMap: Record<string, string> = {
     "character_portrait": "portrait_asset_id",
     "location_reference": "reference_asset_id",
+    "storyboard_image_optimized": "optimized_image_asset_id",
   };
 
   const tableMap: Record<string, string> = {
     character: "characters",
     location: "locations",
+    storyboard: "storyboards",
   };
 
   const column = columnMap[assetType];
@@ -229,10 +232,13 @@ async function updateEntityAssetRef(
     return { ok: true };
   }
 
+  // storyboard 实体以 scene_id 为 entity_id（见 image-generator 的 asset 写入约定）
+  const filterColumn = entityType === "storyboard" ? "scene_id" : "id";
+
   const { error } = await supabase
     .from(table)
     .update({ [column]: assetId })
-    .eq("id", entityId);
+    .eq(filterColumn, entityId);
 
   if (error) {
     return { ok: false, error: error.message };

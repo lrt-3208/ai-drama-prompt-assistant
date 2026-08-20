@@ -16,6 +16,8 @@ const ALLOWED_TASK_TYPES = [
   "regenerate_locations",
   "regenerate_style",
   "generate_script",
+  "generate_episode_plot",
+  "generate_episode_outline",
   "generate_storyboard",
   "generate_storyboard_episode",
   "generate_prompt",

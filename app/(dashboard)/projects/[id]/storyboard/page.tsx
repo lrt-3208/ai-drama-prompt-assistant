@@ -11,11 +11,11 @@ export default async function StoryboardPage({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 4 个独立查询并行执行
-  const [episodesRes, promptsRes, scriptRes, activeTasksRes] = await Promise.all([
+  // 4 个独立查询并行执行（storyboards 用于场景级过期判定 stale）
+  const [episodesRes, promptsRes, storyboardsRes, activeTasksRes] = await Promise.all([
     supabase
       .from("episodes")
-      .select("id, episode_number, title, summary, status, scenes(id, scene_number, location_name, time, weather, shots(id, shot_number, description, action, emotion, environment, cinematography, dialogue))")
+      .select("id, episode_number, title, summary, status, storyboard_version, storyboard_updated_at, plot_version, plot_updated_at, plot_change_summary, outline_version, storyboard_based_on_outline_version, plot_outline, shot_outline, scenes(id, scene_number, location_name, time, weather, shots(id, shot_number, description, action, emotion, environment, cinematography, dialogue))")
       .eq("project_id", id)
       .order("episode_number")
       .order("scene_number", { referencedTable: "scenes", ascending: true })
@@ -25,10 +25,9 @@ export default async function StoryboardPage({
       .select("shot_id, prompt_type")
       .eq("project_id", id),
     supabase
-      .from("scripts")
-      .select("episode_outline")
-      .eq("project_id", id)
-      .single(),
+      .from("storyboards")
+      .select("scene_id, is_stale, stale_reason, status")
+      .eq("project_id", id),
     supabase
       .from("project_tasks")
       .select("id, status, progress, task_type, payload")
@@ -54,7 +53,7 @@ export default async function StoryboardPage({
       projectId={id}
       initial={episodesRes.data as never}
       prompts={promptsRes.data as never}
-      episodeOutline={scriptRes.data?.episode_outline as never}
+      storyboards={storyboardsRes.data as never}
       initialTasks={initialTasks}
     />
   );

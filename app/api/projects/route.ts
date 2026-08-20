@@ -35,11 +35,17 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, synopsis, genre, generation_config } = body;
+  const { name, synopsis, genre, serialization_mode, generation_config } = body;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "项目名称不能为空" }, { status: 400 });
   }
+
+  // 连载模式校验（continuous 连续剧情 / episodic 单元剧 / mixed 混合）
+  const SERIALIZATION_MODES = ["continuous", "episodic", "mixed"] as const;
+  const mode = SERIALIZATION_MODES.includes(serialization_mode)
+    ? serialization_mode
+    : "continuous";
 
   // 检查用户是否已配置默认文本模型
   const hasModel = await hasDefaultAIModel(supabase, user.id, "text");
@@ -59,6 +65,7 @@ export async function POST(request: NextRequest) {
       genre: genre?.trim() || null,
       status: "draft",
       asset_status: "draft",
+      serialization_mode: mode,
       generation_config: generation_config || null,
     })
     .select("id, name, synopsis, genre, status, created_at")

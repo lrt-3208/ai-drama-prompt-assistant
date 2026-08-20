@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,69 +129,79 @@ export function StoryForm({ projectId, initialStory, activeTask }: { projectId: 
       </div>
 
       {/* AI 分析 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">AI 分析</CardTitle>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAnalyze}
-              disabled={isGenerating || saving}
-            >
-              {isGenerating ? "分析中..." : "重新分析故事"}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <span className="w-1 h-4 bg-primary rounded" />
+          <span className="text-sm font-medium text-foreground">AI 分析</span>
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={isGenerating || saving}
+            className="ml-auto px-2.5 py-1 rounded-lg bg-surface2 border border-border text-muted-foreground text-[11px] hover:border-primary/50 hover:text-primary transition disabled:opacity-40"
+          >
+            {isGenerating ? "分析中..." : "✨ 重新分析故事"}
+          </button>
+        </div>
+        <div className="p-5 grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="theme">主题</Label>
+            <Label htmlFor="theme" className="text-xs">主题</Label>
             <Input
               id="theme"
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
               placeholder="如：重生复仇豪门"
+              className="text-xs"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="genre">类型</Label>
+            <Label htmlFor="genre" className="text-xs">类型</Label>
             <Input
               id="genre"
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
               placeholder="如：都市/悬疑/古风"
+              className="text-xs"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="coreConflict">核心冲突</Label>
+            <Label htmlFor="coreConflict" className="text-xs">核心冲突</Label>
             <Input
               id="coreConflict"
               value={coreConflict}
               onChange={(e) => setCoreConflict(e.target.value)}
               placeholder="如：被背叛后重返家族夺回一切"
+              className="text-xs"
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="targetEmotion">情绪基调</Label>
+            <Label htmlFor="targetEmotion" className="text-xs">情绪基调</Label>
             <Input
               id="targetEmotion"
               value={targetEmotion}
               onChange={(e) => setTargetEmotion(e.target.value)}
               placeholder="如：爽感+紧张+释放"
+              className="text-xs"
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* 操作按钮 */}
-      <div className="flex gap-3">
-        <Button type="submit" disabled={saving || isGenerating}>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving || isGenerating}
+          className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-medium hover:bg-primary/90 transition disabled:opacity-40"
+        >
           {saving ? "保存中..." : "保存修改"}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(`/projects/${projectId}/script`)}>
-          生成剧本
-        </Button>
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push(`/projects/${projectId}/script`)}
+          className="px-3 py-1.5 rounded-lg bg-surface2 border border-border text-muted-foreground text-[11px] hover:border-primary/50 hover:text-primary transition"
+        >
+          生成剧本 →
+        </button>
       </div>
     </form>
   );

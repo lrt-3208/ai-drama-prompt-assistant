@@ -9,9 +9,9 @@ import { AIService } from "@/lib/ai/ai-service";
 import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
+import { getRenderedSystemPrompt } from "@/lib/ai/node-template-loader";
 import * as AssetVersions from "@/lib/models/asset-versions";
 import { runImpact } from "@/lib/lifecycle/impact-engine";
-import { getGenerationConfig, type GenerationConfig } from "@/lib/ai-actions/config";
 
 /** 依赖注入上下文：不传则 fallback 到 cookie client */
 export interface AIActionContext {
@@ -100,29 +100,12 @@ interface GeneratedStyle {
   lighting: string;
   cinematography: string;
   fixed_prompt: string;
+  negative_prompt?: string;
 }
 
 // ============================================
-// 1. enrichStory — 故事分析
+// 1. enrichStory — 故事分析（模板见 node-registry: story）
 // ============================================
-
-const STORY_SYSTEM_PROMPT = `你是一位专业的短剧故事分析师。根据用户输入的故事创意，分析并生成结构化故事元数据。
-
-【语言要求】所有字段内容必须用中文输出。
-
-要求：
-1. theme: 故事主题（如"重生复仇豪门"、"都市爱情成长"）
-2. core_conflict: 核心冲突（一句话概括，如"被背叛后重返家族夺回一切"）
-3. target_emotion: 目标情绪基调（如"爽感+紧张+释放"）
-4. genre: 剧本类型（如"都市/悬疑/古风/甜宠/复仇"）
-
-请以 JSON 格式输出，不要输出任何其他内容：
-{
-  "theme": "...",
-  "core_conflict": "...",
-  "target_emotion": "...",
-  "genre": "..."
-}`;
 
 export async function enrichStory(
   projectId: string,
@@ -142,9 +125,10 @@ export async function enrichStory(
     throw new Error("未找到故事数据，无法分析");
   }
 
-  // 2. 调用 AI 生成
+  // 2. 加载节点模板并调用 AI 生成
+  const storySystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "story");
   const messages: ChatMessage[] = [
-    { role: "system", content: STORY_SYSTEM_PROMPT },
+    { role: "system", content: storySystemPrompt },
     { role: "user", content: `故事创意：${story.raw_input}` },
   ];
 
@@ -175,72 +159,8 @@ export async function enrichStory(
 }
 
 // ============================================
-// 2. generateCharacters — 角色生成（merge 模式）
+// 2. generateCharacters — 角色生成（merge 模式，模板见 node-registry: character）
 // ============================================
-
-function buildCharacterSystemPrompt(config: GenerationConfig): string {
-  return `你是一位专业的短剧角色设计师。根据故事创意，生成 ${config.character_count.min}-${config.character_count.max} 个角色。
-
-【语言要求】所有描述性字段（name/appearance/personality/background/clothing）必须用中文输出，仅 fixed_prompt 用英文。
-
-每个角色必须包含 operation 字段：
-- operation: "create"（新增角色）或 "update"（修改已有角色）
-- character_ref: 仅当 operation=update 时必填，值为已有角色的 stable_key（如 char_a3f9b）
-- name: 角色名字（中文）
-- role: 角色类型（主角/配角/反派）
-- age: 年龄（必须为纯整数，如 25。不要包含"岁"、"外貌"等文字描述）
-- gender: 性别
-- appearance: 外貌描述（中文，详细）
-- personality: 性格描述（中文）
-- background: 背景故事（中文）
-- clothing: 标志性服装描述（中文）
-- fixed_prompt: 固定视觉 Prompt（英文，用于生成角色定妆照，必须包含站立姿态和纯净背景，如"young Chinese man, short black hair, sharp eyes, wearing dark suit, confident expression, standing pose, full body, clean white background, studio lighting"）
-
-【fixed_prompt 重要约束 — 定妆照规范】
-fixed_prompt 是用户复制到 AI 图片生成工具生成角色定妆照的 Prompt，必须满足以下要求：
-1. 姿态：必须为站立姿态（必须包含 "standing pose", "full body" 等关键词）
-2. 背景：必须为纯净背景（必须包含 "clean white background" 或 "solid color background, no scenery" 等关键词）
-3. 光照：推荐影棚光照（"studio lighting", "even lighting"）
-4. 禁止：不得包含任何场景描述、环境元素、动态姿势（如坐、蹲、跑、跳等）
-
-【重要 — 保护用户修改】
-如果提供了已有角色列表（含 stable_key），以下规则必须遵守：
-1. 已有角色必须使用 operation=update 并填写正确的 character_ref（stable_key）
-2. 已有角色的 name 和 role 不可更改（除非用户明确要求修改）
-3. 已有角色的其他字段尽量保持原值，除非用户明确要求修改
-4. 新增角色使用 operation=create，不需要填写 character_ref
-5. 不要捏造不存在的 stable_key，只使用已有角色列表中提供的 stable_key
-6. 如果某个已有角色不需要修改，可以不输出它
-
-请以 JSON 数组格式输出，不要输出任何其他内容：
-[
-  {
-    "operation": "create",
-    "name": "...",
-    "role": "...",
-    "age": 25,
-    "gender": "...",
-    "appearance": "...",
-    "personality": "...",
-    "background": "...",
-    "clothing": "...",
-    "fixed_prompt": "..."
-  },
-  {
-    "operation": "update",
-    "character_ref": "char_xxxxx",
-    "name": "...",
-    "role": "...",
-    "age": 25,
-    "gender": "...",
-    "appearance": "...",
-    "personality": "...",
-    "background": "...",
-    "clothing": "...",
-    "fixed_prompt": "..."
-  }
-]`;
-}
 
 export async function generateCharacters(
   projectId: string,
@@ -249,9 +169,6 @@ export async function generateCharacters(
   ctx?: AIActionContext
 ): Promise<{ generated: number; updated: number }> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
-
-  // 0. 读取生成数量配置
-  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取故事数据（含元数据）
   const { data: story } = await supabase
@@ -294,12 +211,14 @@ export async function generateCharacters(
 
   userParts.push("\n请基于以上信息，生成角色列表。已有角色如需修改请用 operation=update + character_ref，新增角色用 operation=create。");
 
+  // 4. 加载节点模板（数量变量由模板渲染注入）
+  const characterSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "character");
   const messages: ChatMessage[] = [
-    { role: "system", content: buildCharacterSystemPrompt(genConfig) },
+    { role: "system", content: characterSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 
-  // 4. 调用 AI 生成
+  // 5. 调用 AI 生成
   const charAIConfig = await getUserDefaultAIModel(supabase, userId);
   const generated = await AIService.generateJSON<GeneratedCharacter[]>(
     messages,
@@ -426,54 +345,8 @@ export async function generateCharacters(
 }
 
 // ============================================
-// 3. generateLocations — 场景生成（merge 模式）
+// 3. generateLocations — 场景生成（merge 模式，模板见 node-registry: location）
 // ============================================
-
-function buildLocationSystemPrompt(config: GenerationConfig): string {
-  return `你是一位专业的短剧场景设计师。根据故事创意，生成 ${config.location_count.min}-${config.location_count.max} 个核心场景。
-
-【语言要求】所有描述性字段（name/description/environment/time/weather/color_style）必须用中文输出，仅 fixed_prompt 用英文。
-
-每个场景必须包含 operation 字段：
-- operation: "create"（新增场景）或 "update"（修改已有场景）
-- location_ref: 仅当 operation=update 时必填，值为已有场景的 stable_key（如 location_k7m2x）
-- name: 场景名称（中文）
-- description: 场景描述（中文）
-- environment: 环境描述（中文）
-- time: 时间设定（中文）
-- weather: 天气氛围（中文）
-- color_style: 色彩风格（中文）
-- fixed_prompt: 固定视觉 Prompt（英文）
-
-【重要 — 保护用户修改】
-如果提供了已有场景列表（含 stable_key），请保留已有场景，优先新增场景满足用户要求。
-不要捏造不存在的 stable_key，只使用已有场景列表中提供的 stable_key。
-
-请以 JSON 数组格式输出，不要输出任何其他内容：
-[
-  {
-    "operation": "create",
-    "name": "...",
-    "description": "...",
-    "environment": "...",
-    "time": "...",
-    "weather": "...",
-    "color_style": "...",
-    "fixed_prompt": "..."
-  },
-  {
-    "operation": "update",
-    "location_ref": "location_xxxxx",
-    "name": "...",
-    "description": "...",
-    "environment": "...",
-    "time": "...",
-    "weather": "...",
-    "color_style": "...",
-    "fixed_prompt": "..."
-  }
-]`;
-}
 
 export async function generateLocations(
   projectId: string,
@@ -482,9 +355,6 @@ export async function generateLocations(
   ctx?: AIActionContext
 ): Promise<{ generated: number; updated: number }> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
-
-  // 0. 读取生成数量配置
-  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取故事数据
   const { data: story } = await supabase
@@ -524,8 +394,10 @@ export async function generateLocations(
 
   userParts.push("\n请基于以上信息，生成场景列表。已有场景如需修改请用 operation=update + location_ref，新增场景用 operation=create。");
 
+  // 3. 加载节点模板（数量变量由模板渲染注入）
+  const locationSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "location");
   const messages: ChatMessage[] = [
-    { role: "system", content: buildLocationSystemPrompt(genConfig) },
+    { role: "system", content: locationSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 
@@ -643,35 +515,8 @@ export async function generateLocations(
 }
 
 // ============================================
-// 4. generateStyle — 风格生成（upsert）
+// 4. generateStyle — 风格生成（upsert，模板见 node-registry: style）
 // ============================================
-
-const STYLE_SYSTEM_PROMPT = `你是一位专业的短剧视觉风格设计师。根据故事创意，生成 1 条视觉风格指南。
-
-【语言要求】所有描述性字段（name/camera_style/color/lighting/cinematography）必须用中文输出，仅 fixed_prompt 用英文。
-
-必须包含 operation 字段：
-- operation: "create"（首次生成）或 "update"（修改已有风格）
-- style_ref: 仅当 operation=update 时必填，值为已有风格的 stable_key（如 style_p8q4d）
-- name: 风格名称（中文）
-- camera_style: 摄影风格（中文）
-- color: 色彩风格（中文）
-- lighting: 光影风格（中文）
-- cinematography: 镜头语言（中文）
-- fixed_prompt: 固定视觉 Prompt（英文，如"cinematic shot, cool color palette, natural lighting, shallow depth of field, film grain texture"）
-
-如果提供了已有风格的 stable_key，请使用 operation=update 并填写 style_ref。
-
-请以 JSON 格式输出，不要输出任何其他内容：
-{
-  "operation": "create",
-  "name": "...",
-  "camera_style": "...",
-  "color": "...",
-  "lighting": "...",
-  "cinematography": "...",
-  "fixed_prompt": "..."
-}`;
 
 export async function generateStyle(
   projectId: string,
@@ -718,8 +563,10 @@ export async function generateStyle(
 
   userParts.push("\n请基于以上信息，生成视觉风格指南。已有风格请用 operation=update + style_ref。");
 
+  // 加载节点模板（与 story/character/location 节点一致的配置化链路）
+  const styleSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "style");
   const messages: ChatMessage[] = [
-    { role: "system", content: STYLE_SYSTEM_PROMPT },
+    { role: "system", content: styleSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 
@@ -755,12 +602,20 @@ export async function generateStyle(
         lighting: generated.lighting || null,
         cinematography: generated.cinematography || null,
         fixed_prompt: newFixedPrompt,
+        negative_prompt: generated.negative_prompt || null,
       })
       .eq("id", existingStyle.id);
 
     if (error) {
       throw new Error(`风格更新失败: ${error.message}`);
     }
+
+    // 同步回写 projects.visual_style_id（与手动保存 POST /api/projects/[id]/style 行为一致，
+    // 否则 scene-context-builder 通过 visual_style_id 关联查询会拿不到风格）
+    await supabase
+      .from("projects")
+      .update({ visual_style_id: existingStyle.id })
+      .eq("id", projectId);
 
     // fixed_prompt 变更时写入 asset_prompt_versions + 触发影响传播
     if (fixedPromptChanged && newFixedPrompt) {
@@ -795,6 +650,7 @@ export async function generateStyle(
         lighting: generated.lighting || null,
         cinematography: generated.cinematography || null,
         fixed_prompt: generated.fixed_prompt || null,
+        negative_prompt: generated.negative_prompt || null,
         stable_key: stableKey,
       }, { onConflict: "project_id" })
       .select("id")
@@ -803,6 +659,13 @@ export async function generateStyle(
     if (error) {
       throw new Error(`风格保存失败: ${error.message}`);
     }
+
+    // 同步回写 projects.visual_style_id（与手动保存 POST /api/projects/[id]/style 行为一致，
+    // 否则 scene-context-builder 通过 visual_style_id 关联查询会拿不到风格）
+    await supabase
+      .from("projects")
+      .update({ visual_style_id: newRec.id })
+      .eq("id", projectId);
 
     // 新风格写入初始 asset_prompt_versions
     if (generated.fixed_prompt) {

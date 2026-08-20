@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
@@ -119,65 +116,98 @@ export function SceneVideoPromptCard({
   };
 
   return (
-    <Card className={`border-l-4 ${sceneVideoPrompt?.is_stale ? "border-l-amber-500" : "border-l-primary/40"}`}>
-      <CardContent className="pt-4">
+    <div
+      className={`bg-background/60 border rounded-lg p-3.5 ${
+        sceneVideoPrompt?.is_stale ? "border-stale/40" : "border-border"
+      }`}
+    >
+      <div>
         {/* 头部 */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">场景 {sceneNumber}</Badge>
-            {locationName && <Badge variant="outline">{locationName}</Badge>}
-            <Badge variant="secondary">🎬 场景视频</Badge>
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+              场景 {sceneNumber}
+            </span>
+            {locationName && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+                {locationName}
+              </span>
+            )}
+            {currentVersion && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">
+                已生成
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {sceneVideoPrompt?.is_stale && (
-              <Badge variant="outline" className="text-amber-500 border-amber-500/40">
-                ⚠️ 资产已修改
-              </Badge>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-stale/20 text-stale border border-stale/40">
+                ⚠ 资产已修改
+              </span>
             )}
             {sceneVideoPrompt?.quality_score && (
-              <Badge
-                variant="outline"
-                className={
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded border ${
                   sceneVideoPrompt.quality_score >= 4
-                    ? "text-green-600 border-green-500/40"
+                    ? "text-green-400 border-green-500/30 bg-green-500/10"
                     : sceneVideoPrompt.quality_score >= 3
-                    ? "text-amber-500 border-amber-500/40"
-                    : "text-red-500 border-red-500/40"
-                }
+                    ? "text-stale border-stale/30 bg-stale/10"
+                    : "text-red-400 border-red-500/30 bg-red-500/10"
+                }`}
               >
-                质量 {sceneVideoPrompt.quality_score}/5
-              </Badge>
+                {sceneVideoPrompt.quality_score}/5
+              </span>
             )}
           </div>
         </div>
 
         {/* 过期原因 */}
         {sceneVideoPrompt?.is_stale && sceneVideoPrompt?.stale_reason && (
-          <div className="mb-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 p-2 text-xs text-amber-700 dark:text-amber-400">
+          <div className="mb-2.5 rounded bg-stale/10 border border-stale/25 p-2 text-[10px] text-stale">
             {sceneVideoPrompt.stale_reason}
           </div>
         )}
 
         {/* 质量评语 */}
         {sceneVideoPrompt?.quality_score && sceneVideoPrompt?.quality_note && (
-          <div className="mb-3 rounded-lg bg-muted/30 p-2 text-xs text-muted-foreground">
+          <div className="mb-2.5 rounded bg-surface2 p-2 text-[9px] text-muted-foreground">
             <span className="font-medium">评分说明：</span>
             {sceneVideoPrompt.quality_note}
           </div>
         )}
 
-        {/* Storyboard Document 已就绪提示 */}
-        {storyboardStatus === "ready" && (
-          <div className="mb-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 p-2 text-xs text-green-700 dark:text-green-400">
-            ✓ Storyboard 文档已就绪，场景视频 Prompt 可基于文档内容生成
-          </div>
-        )}
+        {/* 前置条件（原型：② + shot_image 就绪状态） */}
+        <div className="mb-2.5 flex items-center gap-2 flex-wrap text-[9px]">
+          <span className="text-muted-foreground">前置条件：</span>
+          <span
+            className={`px-1.5 py-0.5 rounded ${
+              storyboardStatus === "ready"
+                ? "bg-green-500/15 text-green-400"
+                : "bg-stale/15 text-stale"
+            }`}
+          >
+            ② Storyboard Document {storyboardStatus === "ready" ? "✓" : "未就绪"}
+          </span>
+          <span
+            className={`px-1.5 py-0.5 rounded ${
+              missingShots.length === 0
+                ? "bg-green-500/15 text-green-400"
+                : "bg-stale/15 text-stale"
+            }`}
+          >
+            {missingShots.length === 0
+              ? "shot_image 全部已回传 ✓"
+              : `镜头 ${missingShots.join("、")} 缺图`}
+          </span>
+        </div>
 
         {/* 依赖图片缩略图（用于视频生成参考） */}
         {dependencyImages.length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs font-medium text-muted-foreground mb-2">参考图片（{dependencyImages.length} 张，用于视频生成）</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="mb-2.5">
+            <p className="text-[9px] text-muted-foreground mb-1.5">
+              参考图片（{dependencyImages.length} 张，用于视频生成）
+            </p>
+            <div className="flex flex-wrap gap-1.5">
               {dependencyImages.map((img, i) => (
                 <div key={i} className="relative group flex-shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -185,11 +215,9 @@ export function SceneVideoPromptCard({
                     src={img.url}
                     alt={img.label}
                     onClick={() => setPreviewUrl(img.url)}
-                    className="w-16 h-16 rounded-lg object-cover border cursor-pointer hover:opacity-80 transition-opacity"
+                    title={img.label}
+                    className="w-10 h-10 rounded object-cover border border-border cursor-pointer hover:border-primary/50 transition-colors"
                   />
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] text-center py-0.5 rounded-b-lg truncate px-1">
-                    {img.label}
-                  </span>
                 </div>
               ))}
             </div>
@@ -208,16 +236,16 @@ export function SceneVideoPromptCard({
 
         {/* 内容 */}
         {currentVersion ? (
-          <div className="space-y-3">
-            <div className="bg-muted/30 rounded-lg p-3 text-sm">
-              <pre className="whitespace-pre-wrap font-mono text-xs">
+          <div className="space-y-2.5">
+            <div className="bg-surface2 rounded p-2.5">
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-muted-foreground leading-relaxed">
                 {currentVersion.content}
               </pre>
             </div>
             {currentVersion.negative_prompt && (
-              <div className="bg-muted/20 rounded-lg p-3 text-xs">
-                <span className="text-muted-foreground font-medium">Negative Prompt:</span>
-                <pre className="whitespace-pre-wrap font-mono mt-1">
+              <div className="bg-surface2/60 rounded p-2.5">
+                <div className="text-[9px] text-muted-foreground mb-1">negative_prompt</div>
+                <pre className="whitespace-pre-wrap font-mono text-[9px] text-muted-foreground/80 leading-relaxed">
                   {currentVersion.negative_prompt}
                 </pre>
               </div>
@@ -225,8 +253,8 @@ export function SceneVideoPromptCard({
 
             {/* 版本选择器 — 点击切换 is_current（与评分器保持一致） */}
             {sceneVideoPrompt!.prompt_versions.length > 1 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">版本:</span>
+              <div className="flex items-center gap-1.5 flex-wrap text-[9px]">
+                <span className="text-muted-foreground">版本:</span>
                 {sceneVideoPrompt!.prompt_versions.map((v) => (
                   <button
                     key={v.id}
@@ -236,63 +264,81 @@ export function SceneVideoPromptCard({
                       try { await onSwitchVersion(v.id); } finally { setSwitchingVersion(null); }
                     }}
                     disabled={switchingVersion === v.id}
-                    className={`text-xs px-2 py-0.5 rounded ${
+                    className={`px-1.5 py-0.5 rounded transition-colors ${
                       v.is_current
                         ? "bg-primary text-primary-foreground"
-                        : "bg-muted hover:bg-muted/70"
+                        : "bg-surface2 border border-border text-muted-foreground hover:text-primary hover:border-primary/40"
                     }`}
                   >
-                    v{v.version_number} {v.is_current ? "(当前)" : ""}
+                    v{v.version_number}
+                    {v.is_current ? " (当前)" : ""}
                     {switchingVersion === v.id ? " ..." : ""}
                   </button>
                 ))}
               </div>
             )}
 
-            {/* 操作按钮 */}
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleCopy} disabled={copied}>
-                {copied ? "已复制" : "复制"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleEvaluate} disabled={isEvaluating || isGenerating}>
-                {isEvaluating ? "评分中..." : "质量评分"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleGenerate} disabled={isGenerating}>
-                {isGenerating ? "生成中..." : "重新生成"}
-              </Button>
+            {/* 操作按钮 — 原型小胶囊样式 */}
+            <div className="flex items-center gap-2 flex-wrap text-[9px] pt-2 border-t border-border">
+              <button
+                onClick={handleCopy}
+                disabled={copied}
+                className="px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition disabled:opacity-50"
+              >
+                {copied ? "✓ 已复制" : "📋 复制"}
+              </button>
+              <button
+                onClick={handleEvaluate}
+                disabled={isEvaluating || isGenerating}
+                className="px-2 py-0.5 rounded bg-surface2 border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition disabled:opacity-40"
+              >
+                {isEvaluating ? "评分中..." : "★ 质量评分"}
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="text-muted-foreground hover:text-primary transition ml-1 disabled:opacity-40"
+              >
+                {isGenerating ? "⟳ 生成中..." : "⟳ 重新生成"}
+              </button>
               {onPreviewContext && (
-                <Button size="sm" variant="ghost" className="text-xs h-8 ml-auto" onClick={onPreviewContext}>
+                <button
+                  onClick={onPreviewContext}
+                  className="text-muted-foreground/70 hover:text-primary transition ml-auto"
+                >
                   🔍 调试信息
-                </Button>
+                </button>
               )}
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {sceneVideoPrompt === null ? (
               <>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground">
                   尚未生成场景视频 Prompt
                 </p>
                 {missingText && (
-                  <p className="text-xs text-amber-500">
-                    ⚠ {missingText}
-                  </p>
+                  <p className="text-[10px] text-stale">⚠ {missingText}</p>
                 )}
-                <Button
-                  size="sm"
+                <button
                   onClick={handleGenerate}
                   disabled={!canGenerate || isGenerating}
+                  className={`text-[10px] px-2.5 py-1 rounded transition ${
+                    canGenerate
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-surface2 border border-border text-muted-foreground/50 cursor-not-allowed"
+                  }`}
                 >
                   {isGenerating ? "生成中..." : canGenerate ? "生成场景视频 Prompt" : "未就绪"}
-                </Button>
+                </button>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">加载中...</p>
+              <p className="text-[10px] text-muted-foreground">加载中...</p>
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

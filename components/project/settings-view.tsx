@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 interface SettingsViewProps {
@@ -74,77 +71,98 @@ export function SettingsView({ projectId }: SettingsViewProps) {
   };
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-3xl">
       <div className="mb-6">
         <h2 className="text-lg font-semibold mb-1">项目设置</h2>
         <p className="text-sm text-muted-foreground">
-          项目基础信息和 AI 模型配置管理。
+          生成数量配置、AI 模型与项目信息管理。
         </p>
       </div>
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">生成数量配置</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground">
+      {/* 生成数量配置 */}
+      <div className="mb-3 bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <span className="w-1 h-4 bg-primary rounded" />
+          <span className="text-sm font-medium text-foreground">生成数量配置</span>
+        </div>
+        <div className="p-5">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
             配置 AI 生成角色、场景、剧本、分镜时的数量范围。修改后对新生成的内容生效，已有数据不受影响。
           </p>
-          {CONFIG_LABELS.map(({ key, label, desc }) => (
-            <div key={key} className="flex items-center gap-3">
-              <div className="flex flex-col gap-0.5 w-28">
-                <Label className="text-xs">{label}</Label>
-                <span className="text-xs text-muted-foreground">{desc}</span>
+          <div className="space-y-2.5">
+            {CONFIG_LABELS.map(({ key, label, desc }) => (
+              <div
+                key={key}
+                className="bg-background/60 border border-border rounded-lg px-3.5 py-2.5 flex items-center gap-3"
+              >
+                <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                  <span className="text-[11px] text-foreground font-medium">{label}</span>
+                  <span className="text-[10px] text-muted-foreground">{desc}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={genConfig[key].min}
+                    onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], min: Number(e.target.value) } })}
+                    className="w-16 h-8 text-xs"
+                  />
+                  <span className="text-[10px] text-muted-foreground">~</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={genConfig[key].max}
+                    onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], max: Number(e.target.value) } })}
+                    className="w-16 h-8 text-xs"
+                  />
+                </div>
               </div>
-              <Input
-                type="number"
-                min={0}
-                value={genConfig[key].min}
-                onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], min: Number(e.target.value) } })}
-                className="w-16"
-              />
-              <span className="text-xs text-muted-foreground">~</span>
-              <Input
-                type="number"
-                min={0}
-                value={genConfig[key].max}
-                onChange={(e) => setGenConfig({ ...genConfig, [key]: { ...genConfig[key], max: Number(e.target.value) } })}
-                className="w-16"
-              />
-            </div>
-          ))}
-          <Button onClick={handleSave} disabled={saving} size="sm" className="self-start">
+            ))}
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="mt-4 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-medium hover:bg-primary/90 transition disabled:opacity-40"
+          >
             {saving ? "保存中..." : "保存配置"}
-          </Button>
-        </CardContent>
-      </Card>
+          </button>
+        </div>
+      </div>
 
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">AI 模型配置</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
+      {/* AI 模型配置 */}
+      <div className="mb-3 bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <span className="w-1 h-4 bg-primary rounded" />
+          <span className="text-sm font-medium text-foreground">AI 模型配置</span>
+        </div>
+        <div className="p-5">
+          <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
             AI 模型配置已迁移到全局管理页面。每个用户可为文本、图片、视频生成分别配置独立的默认模型。
           </p>
-          <Link href="/settings/ai-models">
-            <Button variant="outline" size="sm">
-              前往 AI 模型管理
-            </Button>
+          <Link
+            href="/settings/ai-models"
+            className="inline-block px-3 py-1.5 rounded-lg bg-surface2 border border-border text-muted-foreground text-[11px] hover:border-primary/50 hover:text-primary transition"
+          >
+            前往 AI 模型管理 →
           </Link>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">项目信息</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            项目 ID: <span className="font-mono text-xs">{projectId}</span>
-          </p>
-        </CardContent>
-      </Card>
+      {/* 项目信息 */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-border flex items-center gap-2">
+          <span className="w-1 h-4 bg-primary rounded" />
+          <span className="text-sm font-medium text-foreground">项目信息</span>
+        </div>
+        <div className="p-5">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-muted-foreground">项目 ID</span>
+            <code className="px-1.5 py-0.5 rounded bg-surface2 border border-border font-mono text-[10px] text-muted-foreground">
+              {projectId}
+            </code>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

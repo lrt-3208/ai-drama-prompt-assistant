@@ -6,6 +6,7 @@
 // ============================================
 
 import type { StoryboardFrame } from "@/lib/storyboard/document-types";
+import { PreviewableImage } from "@/components/ui/previewable-image";
 
 interface FrameCardProps {
   frame: StoryboardFrame;
@@ -18,11 +19,11 @@ export function FrameCard({ frame, imageUrl }: FrameCardProps) {
       {/* 缩略图 + 镜号角标 */}
       <div className="relative aspect-video overflow-hidden bg-gray-100">
         {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <PreviewableImage
             src={imageUrl}
             alt={`镜头 ${frame.shot_number}`}
             className="h-full w-full object-cover"
+            previewCaption={`镜头 ${frame.shot_number} · 帧画面`}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">

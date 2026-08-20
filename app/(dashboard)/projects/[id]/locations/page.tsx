@@ -12,8 +12,8 @@ export default async function LocationsPage({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 2 个独立查询并行执行
-  const [locationsRes, activeTaskRes] = await Promise.all([
+  // 3 个独立查询并行执行（含项目级锁定判定：已有剧情则资产锁定）
+  const [locationsRes, activeTaskRes, plotCountRes] = await Promise.all([
     supabase
       .from("locations")
       .select("*")
@@ -27,6 +27,11 @@ export default async function LocationsPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("episodes")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", id)
+      .not("plot_outline", "is", null),
   ]);
 
   // 查询场景参考图的公共 URL
@@ -46,9 +51,16 @@ export default async function LocationsPage({
     }
   }
 
+  const plotCount = plotCountRes.count ?? 0;
+
   return (
-    <div className="max-w-4xl">
-      <LocationList projectId={id} initial={locationsRes.data ?? []} activeTask={activeTaskRes.data as never} assetUrls={assetUrls} />
-    </div>
+    <LocationList
+      projectId={id}
+      initial={locationsRes.data ?? []}
+      activeTask={activeTaskRes.data as never}
+      assetUrls={assetUrls}
+      assetLocked={plotCount > 0}
+      plotCount={plotCount}
+    />
   );
 }

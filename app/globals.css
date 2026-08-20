@@ -46,75 +46,94 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-stale: var(--stale);
+  --color-stale-foreground: var(--stale-foreground);
+  --color-locked: var(--locked);
+  --color-surface2: var(--surface2);
 }
 
+/*
+ * 原型设计系统配色（prototype-v2 全 8 页统一）
+ *   bg #0a0a0f · surface #13131a · surface2 #1a1a24
+ *   border #26262f · primary #7c5cff · stale #f5a623 · locked #4a4a55
+ * 强制暗色：:root 与 .dark 同值，避免主题闪烁
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #0a0a0f;
+  --foreground: #e5e7eb;
+  --card: #13131a;
+  --card-foreground: #e5e7eb;
+  --popover: #13131a;
+  --popover-foreground: #e5e7eb;
+  --primary: #7c5cff;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a24;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1a1a24;
+  --muted-foreground: #6b7280;
+  --accent: #1a1a24;
+  --accent-foreground: #e5e7eb;
+  --destructive: #ef4444;
+  --border: #26262f;
+  --input: #26262f;
+  --ring: #7c5cff;
+  --chart-1: #7c5cff;
+  --chart-2: #f5a623;
+  --chart-3: #22c55e;
+  --chart-4: #ef4444;
+  --chart-5: #6b7280;
+  --radius: 0.75rem;
+  --sidebar: #13131a;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #7c5cff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1a24;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #26262f;
+  --sidebar-ring: #7c5cff;
+  /* 原型专有语义色 */
+  --stale: #f5a623;
+  --stale-foreground: #0a0a0f;
+  --locked: #4a4a55;
+  --surface2: #1a1a24;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0a0a0f;
+  --foreground: #e5e7eb;
+  --card: #13131a;
+  --card-foreground: #e5e7eb;
+  --popover: #13131a;
+  --popover-foreground: #e5e7eb;
+  --primary: #7c5cff;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a24;
+  --secondary-foreground: #e5e7eb;
+  --muted: #1a1a24;
+  --muted-foreground: #6b7280;
+  --accent: #1a1a24;
+  --accent-foreground: #e5e7eb;
+  --destructive: #ef4444;
+  --border: #26262f;
+  --input: #26262f;
+  --ring: #7c5cff;
+  --chart-1: #7c5cff;
+  --chart-2: #f5a623;
+  --chart-3: #22c55e;
+  --chart-4: #ef4444;
+  --chart-5: #6b7280;
+  --sidebar: #13131a;
+  --sidebar-foreground: #e5e7eb;
+  --sidebar-primary: #7c5cff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1a1a24;
+  --sidebar-accent-foreground: #e5e7eb;
+  --sidebar-border: #26262f;
+  --sidebar-ring: #7c5cff;
+  --stale: #f5a623;
+  --stale-foreground: #0a0a0f;
+  --locked: #4a4a55;
+  --surface2: #1a1a24;
 }
 
 @layer base {
@@ -123,8 +142,35 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", var(--font-sans), sans-serif;
   }
   html {
     @apply font-sans;
   }
+  /* 原型滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+}
+
+/* 原型过期态呼吸光晕 */
+@keyframes glowStale {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 166, 35, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.15);
+  }
+}
+.glow-stale {
+  animation: glowStale 2.4s ease-in-out infinite;
 }

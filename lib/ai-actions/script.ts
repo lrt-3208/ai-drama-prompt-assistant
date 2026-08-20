@@ -10,7 +10,7 @@ import type { ChatMessage } from "@/lib/ai/types";
 import { GenerationType } from "@/lib/ai/types";
 import { getUserDefaultAIModel } from "@/lib/ai/config";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getGenerationConfig, type GenerationConfig } from "@/lib/ai-actions/config";
+import { getRenderedSystemPrompt } from "@/lib/ai/node-template-loader";
 
 /** DI 上下文（与 assets.ts 一致） */
 export interface AIActionContext {
@@ -45,41 +45,6 @@ export interface GeneratedScript {
   }>;
 }
 
-/** 剧本生成的 system prompt（根据配置动态生成） */
-function buildScriptSystemPrompt(config: GenerationConfig): string {
-  return `你是一位专业的短剧编剧。根据用户提供的故事创意和已有资产（角色、场景），生成一份结构化剧本。
-
-【语言要求】所有字段内容必须用中文输出。
-
-要求：
-1. synopsis: 故事梗概，应充分描述故事背景、核心冲突和主要角色关系，不少于 300 字
-2. genre: 剧本类型（如：都市爱情、悬疑、家庭伦理、古装等）
-3. characters: 主要角色列表，每个角色包含 name（名字）、role（主角/配角/反派）、description（简短描述）
-4. relationships: 角色之间的关系描述（如："李明与王雪是前任恋人，因误会分手"）
-5. worldview: 故事的世界观设定和时间背景
-6. plot_outline: 故事大纲，分为多个剧情段落（不是拍摄场景），每个段落包含：
-   - scene: 段落名称（如"背叛真相"、"重生开局"）
-   - description: 该段落的剧情描述
-   - emotion: 该段落的情绪基调（如：紧张、温馨、悲伤等）
-   剧情段落代表故事的结构骨架，后续分镜生成时会自动分配到各集中
-7. episode_outline: 分集大纲，将故事拆分为 ${config.episode_count.min}-${config.episode_count.max} 集，每集包含：
-   - episode: 集数（从1开始）
-   - title: 集标题（如"雨夜重生"、"布局开始"）
-   - outline: 该集剧情大纲，必须包含核心冲突、关键转折、角色弧光和结局走向；集数越多，每集大纲应越详细，确保分镜生成时有足够的情节信息
-   分集原则：每集有明确核心冲突；集间有连贯性；第一集抓人眼球，最后一集收束
-
-请以 JSON 格式输出，不要输出任何其他内容。JSON 格式如下：
-{
-  "synopsis": "...",
-  "genre": "...",
-  "characters": [{"name": "...", "role": "...", "description": "..."}],
-  "relationships": "...",
-  "worldview": "...",
-  "plot_outline": [{"scene": "...", "description": "...", "emotion": "..."}],
-  "episode_outline": [{"episode": 1, "title": "...", "outline": "..."}]
-}`;
-}
-
 /**
  * 生成剧本
  * @param projectId 项目 ID
@@ -92,9 +57,6 @@ export async function generateScript(
   ctx?: AIActionContext
 ): Promise<GeneratedScript> {
   const supabase = ctx?.supabase ?? await getDefaultClient();
-
-  // 0. 读取生成数量配置
-  const genConfig = await getGenerationConfig(projectId, { supabase });
 
   // 1. 读取故事数据
   const { data: story, error: storyError } = await supabase
@@ -160,8 +122,10 @@ export async function generateScript(
     "\n请基于以上信息，生成一份完整的短剧剧本。如果角色或场景不足，可以补充新的角色和场景。"
   );
 
+  // 5. 加载节点模板（分集数量变量由模板渲染注入；modeAware 节点按项目连载模式选模板）
+  const scriptSystemPrompt = await getRenderedSystemPrompt(supabase, userId, projectId, "script");
   const messages: ChatMessage[] = [
-    { role: "system", content: buildScriptSystemPrompt(genConfig) },
+    { role: "system", content: scriptSystemPrompt },
     { role: "user", content: userParts.join("\n") },
   ];
 

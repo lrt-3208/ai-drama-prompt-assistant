@@ -22,6 +22,26 @@ export async function PATCH(
   const body = await request.json();
   const updateData: Record<string, unknown> = {};
 
+  // 锁定守卫：已锁定的角色禁止修改内容字段（仅允许 is_locked 本身用于解锁）
+  const contentKeys = [
+    "name", "role", "age", "gender", "appearance",
+    "personality", "background", "clothing", "fixed_prompt",
+  ];
+  const touchesContent = contentKeys.some((k) => body[k] !== undefined);
+  if (touchesContent) {
+    const { data: existing } = await supabase
+      .from("characters")
+      .select("is_locked")
+      .eq("id", characterId)
+      .maybeSingle();
+    if (existing?.is_locked) {
+      return NextResponse.json(
+        { error: "该角色已锁定，请先解锁后再修改" },
+        { status: 409 }
+      );
+    }
+  }
+
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.role !== undefined) updateData.role = body.role?.trim() || null;
   if (body.age !== undefined) updateData.age = sanitizeAge(body.age);

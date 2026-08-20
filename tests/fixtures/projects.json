@@ -5,6 +5,14 @@
     "synopsis": "落魄程序员林逸在一次意外中穿越到修仙世界，修炼千年后重返都市。曾经的同事成了下属，前女友跪求复合，而暗处的敌人正在窥伺他的力量。林逸如何在繁华都市中隐藏身份，又如何在修仙界的恩怨中全身而退？",
     "genre": "都市修仙",
     "status": "draft",
+    "styleKey": "anime",
+    "generation_config": {
+      "character_count": { "min": 5, "max": 10 },
+      "location_count": { "min": 4, "max": 8 },
+      "episode_count": { "min": 8, "max": 12 },
+      "scenes_per_episode": { "min": 4, "max": 6 },
+      "shots_per_scene": { "min": 3, "max": 5 }
+    },
     "expectedTaskFlow": ["initialize_assets", "regenerate_story", "regenerate_characters", "regenerate_locations", "regenerate_style"]
   },
   {
@@ -13,6 +21,14 @@
     "synopsis": "苏家千金苏婉宁被迫替嫁入陆家，传闻陆家大少爷陆景琛车祸后残疾坐轮椅，性情暴戾。新婚夜，苏婉宁发现陆景琛并非真残疾，而是一直在暗中调查家族内鬼。两人从互相试探到联手破局，最终揭开陆家商业帝国背后的惊天秘密。",
     "genre": "豪门恩怨",
     "status": "draft",
+    "styleKey": "live",
+    "generation_config": {
+      "character_count": { "min": 3, "max": 8 },
+      "location_count": { "min": 3, "max": 6 },
+      "episode_count": { "min": 6, "max": 10 },
+      "scenes_per_episode": { "min": 3, "max": 5 },
+      "shots_per_scene": { "min": 2, "max": 6 }
+    },
     "expectedTaskFlow": ["initialize_assets", "regenerate_story", "regenerate_characters", "regenerate_locations", "regenerate_style"]
   },
   {
@@ -21,6 +37,14 @@
     "synopsis": "地球即将迎来太阳风暴，电磁辐射将摧毁所有电子设备。大学生陈默提前三天收到预警，开始疯狂囤货。她在废品站捡到的神秘金属箱，竟是末世生存的关键。当城市陷入混乱，她如何用有限的物资和智慧保护身边的人？",
     "genre": "末日生存",
     "status": "draft",
+    "styleKey": "manga",
+    "generation_config": {
+      "character_count": { "min": 3, "max": 6 },
+      "location_count": { "min": 3, "max": 8 },
+      "episode_count": { "min": 3, "max": 6 },
+      "scenes_per_episode": { "min": 2, "max": 4 },
+      "shots_per_scene": { "min": 2, "max": 4 }
+    },
     "expectedTaskFlow": ["initialize_assets", "regenerate_story", "regenerate_characters", "regenerate_locations", "regenerate_style"]
   },
   {
@@ -29,6 +53,14 @@
     "synopsis": "现代奶茶店老板娘叶灵意外穿越到古代小镇，凭借一手调制饮品的绝活，在集市上摆摊卖起了'神仙水'。从街头小贩到御赐贡品，她用奶茶征服了挑剔的县令、豪爽的将军和神秘的江湖客。但一场突如其来的疫病，让她的奶茶店成了全城最后的希望。",
     "genre": "古风轻喜剧",
     "status": "draft",
+    "styleKey": "guofeng",
+    "generation_config": {
+      "character_count": { "min": 3, "max": 8 },
+      "location_count": { "min": 3, "max": 8 },
+      "episode_count": { "min": 3, "max": 5 },
+      "scenes_per_episode": { "min": 2, "max": 4 },
+      "shots_per_scene": { "min": 2, "max": 4 }
+    },
     "expectedTaskFlow": ["initialize_assets", "regenerate_story", "regenerate_characters", "regenerate_locations", "regenerate_style"]
   },
   {
@@ -37,6 +69,14 @@
     "synopsis": "刑警队长顾寒被调入一个神秘部门——深渊调查局，专门处理超自然刑事案件。他的搭档是一个失去记忆的少女'零号'，她能感知死者最后的情绪碎片。两人追踪连环失踪案，却发现所有线索都指向十年前一起被压下的旧案——而那起案件，与顾寒的父亲有关。",
     "genre": "悬疑推理",
     "status": "draft",
+    "styleKey": "live",
+    "generation_config": {
+      "character_count": { "min": 3, "max": 8 },
+      "location_count": { "min": 3, "max": 8 },
+      "episode_count": { "min": 3, "max": 10 },
+      "scenes_per_episode": { "min": 2, "max": 6 },
+      "shots_per_scene": { "min": 2, "max": 6 }
+    },
     "expectedTaskFlow": ["initialize_assets", "regenerate_story", "regenerate_characters", "regenerate_locations", "regenerate_style"]
   }
 ]

@@ -12,8 +12,8 @@ export default async function CharactersPage({
   const cookieStore = await cookies();
   const supabase = createClient(cookieStore);
 
-  // 2 个独立查询并行执行
-  const [charactersRes, activeTaskRes] = await Promise.all([
+  // 3 个独立查询并行执行（含项目级锁定判定：已有剧情则资产锁定）
+  const [charactersRes, activeTaskRes, plotCountRes] = await Promise.all([
     supabase
       .from("characters")
       .select("*")
@@ -27,6 +27,11 @@ export default async function CharactersPage({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("episodes")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", id)
+      .not("plot_outline", "is", null),
   ]);
 
   // 查询角色 fixed_prompt 当前版本号
@@ -60,9 +65,17 @@ export default async function CharactersPage({
     }
   }
 
+  const plotCount = plotCountRes.count ?? 0;
+
   return (
-    <div className="max-w-4xl">
-      <CharacterList projectId={id} initial={charactersRes.data ?? []} activeTask={activeTaskRes.data as never} assetUrls={assetUrls} versionMap={versionMap} />
-    </div>
+    <CharacterList
+      projectId={id}
+      initial={charactersRes.data ?? []}
+      activeTask={activeTaskRes.data as never}
+      assetUrls={assetUrls}
+      versionMap={versionMap}
+      assetLocked={plotCount > 0}
+      plotCount={plotCount}
+    />
   );
 }

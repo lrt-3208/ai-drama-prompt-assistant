@@ -8,6 +8,7 @@
 
 import type { ReactNode } from "react";
 import type { StoryboardRenderData } from "@/lib/storyboard/document-types";
+import { PreviewableImage } from "@/components/ui/previewable-image";
 import { FrameCard } from "./frame-card";
 import { EmotionCurve } from "./emotion-curve";
 import {
@@ -130,8 +131,12 @@ export function StoryboardDocumentView({ data }: StoryboardDocumentViewProps) {
                 <div key={c.name} className="space-y-1">
                   <div className="aspect-[3/4] overflow-hidden rounded-md border border-gray-200 bg-gray-100">
                     {c.portraitUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.portraitUrl} alt={c.name} className="h-full w-full object-cover" />
+                      <PreviewableImage
+                        src={c.portraitUrl}
+                        alt={c.name}
+                        className="h-full w-full object-cover"
+                        previewCaption={`${c.name} · 角色参考图`}
+                      />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
                         无图
@@ -163,8 +168,12 @@ export function StoryboardDocumentView({ data }: StoryboardDocumentViewProps) {
         <Section icon={<MapPin className="size-3.5" />} title="环境与场景设计">
           <div className="aspect-video overflow-hidden rounded-md border border-gray-200 bg-gray-100">
             {locationImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={locationImageUrl} alt={locationName} className="h-full w-full object-cover" />
+              <PreviewableImage
+                src={locationImageUrl}
+                alt={locationName}
+                className="h-full w-full object-cover"
+                previewCaption={`${locationName} · 场景参考图`}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
                 无场景图

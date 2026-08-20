@@ -3,7 +3,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -14,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { usePromptTaskPolling, type PromptTask } from "@/hooks/use-prompt-task-polling";
 import { SceneVideoPromptCard } from "@/components/project/scene-video-prompt-card";
+import { SceneVideoReturnCard } from "@/components/project/scene-video-return-card";
 import { StylePresetSelector } from "@/components/project/style-preset-selector";
 import { ExportDialog } from "@/components/project/export-dialog";
 import { StoryboardAssetCard } from "@/components/project/storyboard-asset-card";
@@ -51,6 +51,8 @@ interface Scene {
   location_name: string | null;
   location_id: string | null;
   time: string | null;
+  /** 成片外部链接（已回传则非空） */
+  video_url?: string | null;
   shots: Shot[];
 }
 
@@ -59,6 +61,9 @@ interface Episode {
   episode_number: number;
   title: string | null;
   summary: string | null;
+  /** 分镜内容版本号：>1 说明分镜被重新生成过 */
+  storyboard_version?: number | null;
+  storyboard_updated_at?: string | null;
   scenes: Scene[];
 }
 
@@ -94,6 +99,7 @@ interface StoryboardRef {
   version_number: number;
   document: StoryboardDocument | null;
   storyboard_image_asset_id: string | null;
+  optimized_image_asset_id: string | null;
   optimized_image_prompt: string | null;
   is_stale: boolean;
   stale_reason: string | null;
@@ -131,7 +137,7 @@ interface PlatformConfig {
 const PLATFORMS: PlatformConfig[] = [
   {
     id: "openai_image",
-    name: "GPT 图片生成",
+    name: "ChatGPT（GPT 生图）",
     desc: "高质量人物与场景",
     emoji: "🟢",
     capabilities: ["人物一致性", "电影感", "角色设计"],
@@ -175,6 +181,9 @@ const PLATFORMS: PlatformConfig[] = [
 // ============================================
 // 平台名称查找
 // ============================================
+
+// 平台 Dialog 打开时的默认选中项（推荐平台，用户仍可改选其他）
+const DEFAULT_PLATFORM_ID = PLATFORMS.find((p) => p.recommended)?.id || PLATFORMS[0].id;
 
 function getPlatformName(platformId: string): string {
   const p = PLATFORMS.find((x) => x.id === platformId);
@@ -425,7 +434,7 @@ function ShotImageCell({
 
   return (
     <>
-      <div className="relative group flex-shrink-0 w-20 h-20">
+      <div className="relative group flex-shrink-0 w-7 h-7">
         {hasImage ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -433,31 +442,33 @@ function ShotImageCell({
               src={displayUrl!}
               alt="镜头图片"
               onClick={() => setPreviewOpen(true)}
-              className="w-20 h-20 rounded-lg object-cover border cursor-pointer hover:opacity-80 transition-opacity"
+              title="shot_image 已回传 · 点击预览"
+              className="w-7 h-7 rounded object-cover border border-primary/40 cursor-pointer hover:border-primary transition-colors"
             />
             {/* 悬浮删除 */}
             <button
               onClick={handleDelete}
               disabled={deleting}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
-              {deleting ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" />}
+              {deleting ? <Loader2 className="size-2 animate-spin" /> : <X className="size-2" />}
             </button>
           </>
         ) : (
           <button
             onClick={() => !disabled && inputRef.current?.click()}
             disabled={uploading || disabled}
-            className={`w-20 h-20 rounded-lg border-2 border-dashed flex flex-col items-center justify-center transition-colors ${
+            title={disabled ? "请先生成 Image Prompt" : "上传 shot_image"}
+            className={`w-7 h-7 rounded border border-dashed flex items-center justify-center transition-colors ${
               disabled
                 ? "border-muted-foreground/20 text-muted-foreground/30 cursor-not-allowed"
-                : "border-muted-foreground/30 text-muted-foreground hover:border-primary/50 hover:bg-muted/50"
+                : "border-muted-foreground/40 text-muted-foreground hover:border-primary/50 hover:bg-primary/10"
             }`}
           >
             {uploading ? (
-              <Loader2 className="size-5 animate-spin" />
+              <Loader2 className="size-3 animate-spin" />
             ) : (
-              <Upload className="size-5" />
+              <Upload className="size-3" />
             )}
           </button>
         )}
@@ -589,6 +600,15 @@ export function PromptWorkbench({
   const [selectedPlatform, setSelectedPlatform] = useState<string>("");
   const [showPlatformDialog, setShowPlatformDialog] = useState(false);
   const [targetShotId, setTargetShotId] = useState<string | null>(null);
+  // 批量重跑过期场景：非空时平台 Dialog 进入批量模式（原型 06「只重跑过期场景」）
+  const [batchRerunEp, setBatchRerunEp] = useState<{
+    epNumber: number;
+    scenes: {
+      sceneId: string;
+      missingImageShots: { id: string }[];
+      docMissing: boolean;
+    }[];
+  } | null>(null);
   const [switchingVersion, setSwitchingVersion] = useState<string | null>(null);
   const [showVersions, setShowVersions] = useState<string | null>(null);
   const [showContextPreview, setShowContextPreview] = useState(false);
@@ -763,7 +783,7 @@ export function PromptWorkbench({
   // 打开平台选择 Dialog
   const openPlatformDialog = (shotId: string) => {
     setTargetShotId(shotId);
-    setSelectedPlatform("");
+    setSelectedPlatform(DEFAULT_PLATFORM_ID);
     setShowPlatformDialog(true);
   };
 
@@ -784,6 +804,49 @@ export function PromptWorkbench({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "创建任务失败");
     }
+  };
+
+  // 批量重跑过期场景（原型 06「只重跑过期场景」）：
+  // ① 为每个缺失的镜头补 Image Prompt；② 为 Doc 未生成的场景补 Storyboard 资产。
+  // ③ 场景视频 Prompt 依赖人工回传镜头图，不在批量范围内（保持手动）。
+  const handleBatchRerun = async () => {
+    if (!batchRerunEp || !selectedPlatform) {
+      toast.error("请选择平台");
+      return;
+    }
+    const platform = PLATFORMS.find((p) => p.id === selectedPlatform);
+    if (!platform) return;
+
+    setShowPlatformDialog(false);
+    const ep = batchRerunEp;
+    setBatchRerunEp(null);
+    setSelectedPlatform("");
+
+    let created = 0;
+    let skipped = 0;
+    for (const scene of ep.scenes) {
+      for (const shot of scene.missingImageShots) {
+        try {
+          await createPromptTask(shot.id, "image", selectedPlatform, platform.lang);
+          created++;
+        } catch {
+          skipped++;
+        }
+      }
+      if (scene.docMissing) {
+        try {
+          await createSceneTask("generate_storyboard_asset", scene.sceneId);
+          created++;
+        } catch {
+          skipped++;
+        }
+      }
+    }
+    toast.info(
+      `第 ${ep.epNumber} 集：已创建 ${created} 个重跑任务` +
+        (skipped > 0 ? `，${skipped} 个跳过（已有任务执行中）` : "") +
+        `。场景视频 Prompt 需在镜头图回传后手动生成。`
+    );
   };
 
   // 打开详情 Dialog
@@ -830,36 +893,294 @@ export function PromptWorkbench({
         </p>
       </div>
 
-      {episodes.map((ep, epIdx) => (
-        <Card key={ep.id} className="mb-3 border-l-4 border-l-primary/40 overflow-hidden py-0 gap-0">
-          <Collapse defaultOpen={epIdx === 0}>
-            <CollapseTrigger className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40">
-              <Badge className="text-sm">第 {ep.episode_number} 集</Badge>
-              {ep.title && <span className="font-medium text-sm">{ep.title}</span>}
-              <span className="text-xs text-muted-foreground ml-auto">
-                {ep.scenes?.length || 0} 场景 · {(ep.scenes || []).reduce((acc, sc) => acc + (sc.shots?.length || 0), 0)} 镜头
-              </span>
-            </CollapseTrigger>
-            <CollapseContent className="px-4 pb-4 pt-2">
+      {episodes.map((ep, epIdx) => {
+        // ===== 集级统计（严格对齐原型 06 头部：四类产物完成度 + 场景级过期计数） =====
+        const epScenes = ep.scenes || [];
+        const epShots = epScenes.flatMap((sc) => sc.shots || []);
+        const epStoryboardVersion = ep.storyboard_version ?? 1;
+        const epRegenerated = epStoryboardVersion > 1;
 
-            {ep.scenes?.map((sc, scIdx) => (
-              <div
-                key={sc.id}
-                className={`mb-5 last:mb-0 pl-4 border-l-2 border-l-muted ${scIdx > 0 ? "mt-4" : ""}`}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="font-semibold text-sm bg-muted px-2 py-0.5 rounded">
-                    场景 {sc.scene_number}
-                  </span>
-                  {sc.location_name && (
-                    <Badge variant="secondary" className="text-xs">
-                      {sc.location_name}
-                    </Badge>
+        // ① Image Prompt 完成度（镜头级）
+        const imageDone = epShots.filter((sh) =>
+          (promptsByShot.get(sh.id) || []).some((p) => p.prompt_type === "image")
+        ).length;
+        // ② Storyboard Document 完成度（场景级）
+        const docDone = epScenes.filter(
+          (sc) => storyboardMap.get(sc.id)?.status === "ready"
+        ).length;
+        // ③ Scene Video Prompt 完成度（场景级）
+        const videoDone = epScenes.filter(
+          (sc) => (promptsByScene.get(sc.id) || []).length > 0
+        ).length;
+        // 🎞 成片回传完成度（场景级）
+        const filmDone = epScenes.filter((sc) => !!sc.video_url).length;
+
+        // 场景级过期：资产改动标记 stale，或分镜重建后指令缺失
+        const staleSceneList = epScenes.filter((sc) => {
+          const sb = storyboardMap.get(sc.id);
+          const sv = (promptsByScene.get(sc.id) || [])[0];
+          if (sb?.is_stale || sv?.is_stale) return true;
+          if (epRegenerated) {
+            return (sc.shots || []).some(
+              (sh) => !(promptsByShot.get(sh.id) || []).some((p) => p.prompt_type === "image")
+            );
+          }
+          return false;
+        });
+        const epHasStale = staleSceneList.length > 0;
+
+        // 画面指令产物状态（画面指令无单一版本号，用完成度概括状态）：
+        // 全 0 = 未生成；Image/Doc/Video 全满 = 已就绪；否则 = 部分完成
+        const promptTotal = epShots.length + epScenes.length * 2;
+        const promptDone = imageDone + docDone + videoDone;
+        let promptBadge: { text: string; cls: string } | null = null;
+        if (epScenes.length > 0) {
+          if (imageDone === 0 && docDone === 0 && videoDone === 0) {
+            promptBadge = { text: "指令未生成", cls: "bg-surface2 text-muted-foreground border border-border" };
+          } else if (promptDone >= promptTotal) {
+            promptBadge = { text: "指令已就绪", cls: "bg-green-500/15 text-green-400 border border-green-500/30" };
+          } else {
+            promptBadge = { text: `指令部分完成 ${promptDone}/${promptTotal}`, cls: "bg-amber-500/15 text-amber-400 border border-amber-500/30" };
+          }
+        }
+
+        // 批量重跑入口：收集过期场景的重跑清单。
+        // 资产变更型 stale（sb/sv is_stale）→ 该场景全部镜头 Image + Doc 重建（生成新版本）；
+        // 分镜重建型 stale（epRegenerated 缺产物）→ 仅补缺失的 Image / Doc。
+        const openBatchRerun = () => {
+          setBatchRerunEp({
+            epNumber: ep.episode_number,
+            scenes: staleSceneList.map((sc) => {
+              const sb0 = storyboardMap.get(sc.id);
+              const assetStale = !!(
+                sb0?.is_stale ||
+                (promptsByScene.get(sc.id) || [])[0]?.is_stale
+              );
+              const shots = sc.shots || [];
+              return {
+                sceneId: sc.id,
+                missingImageShots: (
+                  assetStale
+                    ? shots
+                    : shots.filter(
+                        (sh) =>
+                          !(promptsByShot.get(sh.id) || []).some(
+                            (p) => p.prompt_type === "image"
+                          )
+                      )
+                ).map((sh) => ({ id: sh.id })),
+                docMissing: assetStale || sb0?.status !== "ready",
+              };
+            }),
+          });
+          setSelectedPlatform(DEFAULT_PLATFORM_ID);
+          setShowPlatformDialog(true);
+        };
+
+        return (
+        <div
+          key={ep.id}
+          className={`mb-3 bg-card rounded-xl overflow-hidden border ${
+            epHasStale ? "border-stale/40" : "border-border"
+          }`}
+        >
+          {/* 有过期场景的集默认展开，与原型 06 的 ep-open 一致 */}
+          <Collapse defaultOpen={epIdx === 0 || epHasStale}>
+            <div className="flex items-center">
+            <CollapseTrigger className="flex items-center gap-3 px-5 py-4 hover:bg-surface2/50 flex-1 min-w-0">
+              {/* 集号徽章：反映该集自身是否已生成分镜，不随下游过期变色（原型规范） */}
+              <span className="w-9 h-9 rounded-lg bg-green-500/15 text-green-400 text-xs font-bold flex items-center justify-center shrink-0">
+                {String(ep.episode_number).padStart(2, "0")}
+              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  {ep.title && (
+                    <span className="font-medium text-foreground text-sm">{ep.title}</span>
                   )}
-                  {sc.time && (
-                    <span className="text-xs text-muted-foreground">{sc.time}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+                    {epScenes.length} 场景 · {epShots.length} 镜头
+                  </span>
+                  {promptBadge && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${promptBadge.cls}`}>
+                      {promptBadge.text}
+                    </span>
+                  )}
+                  {epHasStale && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-stale/20 text-stale border border-stale/40">
+                      {staleSceneList.length} / {epScenes.length} 场景过期
+                    </span>
+                  )}
+                  {epRegenerated && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border font-mono">
+                      分镜 v{epStoryboardVersion}
+                    </span>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Image {imageDone} / {epShots.length} · 📄 Doc {docDone} / {epScenes.length} ·
+                  {" "}🎬 Video {videoDone} / {epScenes.length} · 🎞 成片 {filmDone} / {epScenes.length}
+                  {epHasStale && (
+                    <span className="text-stale">
+                      {" "}· S{staleSceneList.map((sc) => sc.scene_number).join(" / S")} 需重跑
+                    </span>
+                  )}
+                </p>
+              </div>
+            </CollapseTrigger>
+            {/* 批量重跑按钮独立于折叠 trigger（原型 06 为可点击 button，span 仅为展示标签是 bug） */}
+            {epHasStale && (
+              <div className="pr-5 pl-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={openBatchRerun}
+                  className="text-[11px] px-3 py-1.5 rounded-lg bg-stale text-stale-foreground font-semibold hover:bg-stale/90 transition"
+                >
+                  ⟳ 只重跑过期场景
+                </button>
+              </div>
+            )}
+            </div>
+            <CollapseContent className="border-t border-border">
+
+            {/* 分镜重建导致下游失效的说明条 */}
+            {epRegenerated && epHasStale && (
+              <div className="bg-stale/10 border-b border-stale/30 px-5 py-3">
+                <div className="text-[11px] text-stale font-semibold mb-0.5">
+                  本集分镜已重新生成（分镜 v{epStoryboardVersion}），
+                  {staleSceneList.length} 个场景的画面指令需重跑
+                </div>
+                <div className="text-[10px] text-muted-foreground leading-relaxed">
+                  分镜内容重建后原有镜头与指令随之失效，需按 ① → ② → ③ 顺序重新生成
+                  {ep.storyboard_updated_at &&
+                    ` · 分镜更新于 ${new Date(ep.storyboard_updated_at).toLocaleString("zh-CN")}`}
+                </div>
+              </div>
+            )}
+
+            <div className="px-5 py-4">
+
+
+            {ep.scenes?.map((sc, scIdx) => {
+              // ===== 场景级状态计算（依赖条 + 三区块共用） =====
+              const svPrompts = promptsByScene.get(sc.id) || [];
+              const svPrompt = svPrompts[0] || null;
+              const sb = storyboardMap.get(sc.id);
+              const missingShotNums = (sc.shots || [])
+                .filter((s) => !shotAssetMap.has(s.id))
+                .map((s) => s.shot_number);
+              // ② Storyboard 文档不依赖 shot_image，只要有镜头就 ready
+              const storyboardReady = (sc.shots || []).length > 0;
+              // ③ Scene Video Prompt 硬依赖：② 已生成(status='ready') + 全部镜头已回传 shot_image
+              const sceneReady = !!sb && sb.status === "ready" && missingShotNums.length === 0 && (sc.shots || []).length > 0;
+
+              // 三类产物进度统计
+              const shotTotal = (sc.shots || []).length;
+              const imagePromptDone = (sc.shots || []).filter(
+                (s) => (promptsByShot.get(s.id) || []).some((p) => p.prompt_type === "image")
+              ).length;
+              const shotImageDone = shotTotal - missingShotNums.length;
+              const isSceneStale = !!svPrompt?.is_stale || !!sb?.is_stale;
+
+              return (
+              <div
+                key={sc.id}
+                className={`mb-3 last:mb-0 bg-surface2 border rounded-lg overflow-hidden ${
+                  isSceneStale ? "border-2 border-stale glow-stale" : "border-border"
+                }`}
+              >
+                <Collapse defaultOpen={scIdx === 0}>
+                <CollapseTrigger
+                  className={`px-4 py-3 gap-3 hover:bg-background/40 ${
+                    isSceneStale ? "bg-stale/5" : ""
+                  }`}
+                >
+                  <span
+                    className={`w-6 h-6 rounded text-[10px] font-medium flex items-center justify-center shrink-0 ${
+                      isSceneStale ? "bg-stale/20 text-stale" : "bg-primary/15 text-primary"
+                    }`}
+                  >
+                    S{sc.scene_number}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {sc.location_name && (
+                        <span className="text-xs text-foreground">{sc.location_name}</span>
+                      )}
+                      {sc.time && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-background text-muted-foreground">
+                          {sc.time}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{shotTotal} 镜</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isSceneStale ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-stale/20 text-stale border border-stale/40">
+                        已过期
+                      </span>
+                    ) : sceneReady && svPrompt ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">
+                        已就绪
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-background text-muted-foreground border border-border">
+                        进行中
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                      Image {imagePromptDone}/{shotTotal} · 📄 Doc{" "}
+                      {sb?.status === "ready" ? `v${sb.version_number}` : "—"} · 🎬 Video{" "}
+                      {svPrompt ? "✓" : "—"}
+                    </span>
+                  </div>
+                </CollapseTrigger>
+
+                <CollapseContent className="border-t border-border">
+                  {/* 上游依赖 + 本场产物进度条 */}
+                  <div className="bg-background/40 border-b border-border px-4 py-2.5 flex items-center gap-4 flex-wrap text-[10px]">
+                    <span className="text-muted-foreground">上游依赖：</span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="text-muted-foreground">分镜内容</span>
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="text-muted-foreground">角色 / 场景 / 风格</span>
+                      <span className="text-muted-foreground/70">已锁定</span>
+                    </span>
+                    <span className="text-border">|</span>
+                    <span className="text-muted-foreground">本场产物：</span>
+                    <span className={imagePromptDone === shotTotal && shotTotal > 0 ? "text-green-400" : "text-stale"}>
+                      ① {imagePromptDone}/{shotTotal}
+                    </span>
+                    <span className={sb?.status === "ready" ? "text-green-400" : "text-muted-foreground"}>
+                      ② {sb?.status === "ready" ? `v${sb.version_number}` : "未生成"}
+                    </span>
+                    <span className={svPrompt ? "text-green-400" : "text-muted-foreground"}>
+                      ③ {svPrompt ? "已生成" : "未生成"}
+                    </span>
+                  </div>
+
+                  {/* ===== ① Shots · Image Prompt ===== */}
+                  <div className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <span className="w-1 h-3.5 bg-primary rounded" />
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-mono">
+                        ①
+                      </span>
+                      <span className="text-[11px] text-foreground font-medium">
+                        Shots · Image Prompt
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {imagePromptDone} / {shotTotal} 条 · shot_image {shotImageDone}/{shotTotal} 已回传
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-muted-foreground mb-2 leading-relaxed">
+                      ▸ 右侧 <span className="text-primary">🖼</span> 为该镜头回传的{" "}
+                      <code className="text-muted-foreground">shot_image</code>
+                      ：Prompt 拿去出图后上传回来，② 的帧缩略图与 ③ 的就绪判定都依赖它。
+                    </div>
 
                 {/* 镜头卡片列表 */}
                 {sc.shots?.map((sh) => {
@@ -876,14 +1197,33 @@ export function PromptWorkbench({
                   return (
                     <div
                       key={sh.id}
-                      className="bg-muted/20 rounded-lg p-3 mb-2 last:mb-0 ml-4 hover:bg-muted/30 transition-colors"
+                      className="bg-background/60 border border-border rounded-lg px-3 py-2 mb-1.5 last:mb-0 flex items-center gap-2.5 hover:bg-background transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-medium text-muted-foreground min-w-[3rem]">
-                          镜头 {sh.shot_number}
-                        </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary font-mono shrink-0">
+                        {String(sh.shot_number).padStart(2, "0")}
+                      </span>
 
-                        {/* 镜头图片缩略图/上传（未生成 Prompt 时禁用） */}
+                      <p className="text-[11px] text-muted-foreground truncate flex-1 min-w-0">
+                        {sh.description || "(无描述)"}
+                      </p>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isImageGenerating ? (
+                          <span className="text-[10px] text-primary animate-pulse">生成中...</span>
+                        ) : hasImage ? (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface2 text-muted-foreground border border-border">
+                            {imagePlatform}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => openPlatformDialog(sh.id)}
+                            className="text-[10px] text-primary hover:underline"
+                          >
+                            生成图片
+                          </button>
+                        )}
+
+                        {/* shot_image 回传口子（原型右侧 🖼） */}
                         <ShotImageCell
                           projectId={projectId}
                           shotId={sh.id}
@@ -894,27 +1234,6 @@ export function PromptWorkbench({
                           onDeleted={handleShotImageDeleted}
                         />
 
-                        <p className="text-sm flex-1 truncate">
-                          {sh.description || "(无描述)"}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs">
-                          {isImageGenerating ? (
-                            <span className="text-primary animate-pulse">图片生成中...</span>
-                          ) : hasImage ? (
-                            <Badge variant="default" className="text-xs gap-1">
-                              {imagePlatform}
-                            </Badge>
-                          ) : (
-                            <button
-                              onClick={() => openPlatformDialog(sh.id)}
-                              className="text-primary hover:underline"
-                            >
-                              生成图片
-                            </button>
-                          )}
-                        </div>
-
-                        {/* 查看详情 */}
                         <button
                           onClick={() =>
                             openDetail(
@@ -926,7 +1245,7 @@ export function PromptWorkbench({
                               sc.location_id || null
                             )
                           }
-                          className="text-xs text-primary hover:underline ml-auto"
+                          className="text-[10px] text-primary hover:underline"
                         >
                           {shotPrompts.length > 0 ? "查看详情" : "详情"}
                         </button>
@@ -934,21 +1253,10 @@ export function PromptWorkbench({
                     </div>
                   );
                 })}
-                
-                {/* 场景视频 Prompt 卡片 + 图片依赖面板 */}
+                  </div>
+
+                {/* ===== ② Storyboard Document + ③ Scene Video Prompt ===== */}
                 {(() => {
-                  const svPrompts = promptsByScene.get(sc.id) || [];
-                  const svPrompt = svPrompts[0] || null;
-                  const sb = storyboardMap.get(sc.id);
-                  const shotIds = (sc.shots || []).map((s) => s.id);
-                  const missingShotNums = (sc.shots || [])
-                    .filter((s) => !shotAssetMap.has(s.id))
-                    .map((s) => s.shot_number);
-                  // Storyboard 文档不依赖 shot_image，只要有镜头就 ready
-                  const storyboardReady = (sc.shots || []).length > 0;
-                  // Scene Video Prompt 硬依赖：① Storyboard Document 已生成(status='ready') ② 全部镜头已回传 shot_image
-                  const sceneReady = !!sb && sb.status === "ready" && missingShotNums.length === 0 && (sc.shots || []).length > 0;
-      
                   // 构建图片依赖数据
                   const charIds = new Set<string>();
                   for (const sh of sc.shots || []) {
@@ -971,6 +1279,7 @@ export function PromptWorkbench({
       
                   // 构建依赖图片缩略图列表（角色定妆照 + 场景参考图 + 故事板优化图片 + 镜头图片）
                   const docStoryboardImageUrl = sb?.storyboard_image_asset_id ? (localAssetUrls[sb.storyboard_image_asset_id] || null) : null;
+                  const docOptimizedImageUrl = sb?.optimized_image_asset_id ? (localAssetUrls[sb.optimized_image_asset_id] || null) : null;
                   const depImages: { url: string; label: string; kind: "character" | "location" | "shot" | "storyboard" }[] = [
                     ...depChars.filter((c) => c.asset_id && localAssetUrls[c.asset_id!]).map((c) => ({ url: localAssetUrls[c.asset_id!]!, label: c.name, kind: "character" as const })),
                     ...depLocs.filter((l) => l.asset_id && localAssetUrls[l.asset_id!]).map((l) => ({ url: localAssetUrls[l.asset_id!]!, label: l.name, kind: "location" as const })),
@@ -1002,13 +1311,29 @@ export function PromptWorkbench({
                   const docLocationName = sc.location_name || locRef?.name || "";
 
                   return (
-                    <div className="mt-3 space-y-2">
+                    <>
+                      {/* ===== ② Storyboard Document ===== */}
+                      <div className="px-4 py-3 border-t border-border">
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <span className="w-1 h-3.5 bg-primary rounded" />
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-mono">
+                            ②
+                          </span>
+                          <span className="text-[11px] text-foreground font-medium">
+                            📄 Storyboard Document
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            scene 级 · 1 份
+                            {sb?.status === "ready" ? ` · v${sb.version_number}` : " · 未生成"}
+                          </span>
+                        </div>
                       <StoryboardAssetCard
                         projectId={projectId}
                         sceneId={sc.id}
                         sceneNumber={sc.scene_number}
                         storyboard={sb ?? null}
                         storyboardImageUrl={docStoryboardImageUrl}
+                        optimizedImageUrl={docOptimizedImageUrl}
                         storyboardVersions={sb ? (storyboardVersionsMap.get(sb.id) || []) : []}
                         missingShots={missingShotNums}
                         ready={storyboardReady}
@@ -1042,6 +1367,27 @@ export function PromptWorkbench({
                         }) : undefined}
                         dependencyImages={depImages}
                       />
+                      </div>
+
+                      {/* ===== ③ Scene Video Prompt ===== */}
+                      <div className="px-4 py-3 border-t border-border">
+                        <div className="flex items-center gap-2 mb-2.5">
+                          <span className="w-1 h-3.5 bg-primary rounded" />
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary font-mono">
+                            ③
+                          </span>
+                          <span className="text-[11px] text-foreground font-medium">
+                            🎬 Scene Video Prompt
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            scene 级 · 1 条
+                          </span>
+                          {!sceneReady && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-stale/15 text-stale">
+                              硬依赖 ② 已生成 + 全部 shot_image 已回传
+                            </span>
+                          )}
+                        </div>
                       <SceneVideoPromptCard
                         sceneId={sc.id}
                         projectId={projectId}
@@ -1066,30 +1412,44 @@ export function PromptWorkbench({
                           setShowContextPreview(true);
                         }}
                       />
-                    </div>
+                      <SceneVideoReturnCard
+                        sceneId={sc.id}
+                        projectId={projectId}
+                        hasVideoPrompt={!!svPrompt}
+                      />
+                      </div>
+                    </>
                   );
                 })()}
+                </CollapseContent>
+                </Collapse>
               </div>
-            ))}
+              );
+            })}
+            </div>
             </CollapseContent>
           </Collapse>
-        </Card>
-      ))}
+        </div>
+        );
+      })}
 
-      {/* 平台选择 Dialog */}
+      {/* 平台选择 Dialog（单镜头 / 批量重跑过期场景共用） */}
       <Dialog
         open={showPlatformDialog}
         onOpenChange={(open) => {
           if (!open) {
             setShowPlatformDialog(false);
             setSelectedPlatform("");
+            setBatchRerunEp(null);
           }
         }}
       >
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              选择图片生成平台
+              {batchRerunEp
+                ? `选择图片生成平台 · 重跑第 ${batchRerunEp.epNumber} 集过期场景`
+                : "选择图片生成平台"}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
@@ -1097,12 +1457,19 @@ export function PromptWorkbench({
               selected={selectedPlatform}
               onSelect={setSelectedPlatform}
             />
+            {batchRerunEp && (
+              <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                将为 {batchRerunEp.scenes.length} 个过期场景创建任务：
+                ① 补齐缺失的镜头 Image Prompt · ② 重建 Storyboard 资产。
+                ③ 场景视频 Prompt 需在镜头图回传后手动生成。
+              </p>
+            )}
             <Button
-              onClick={handleGenerate}
+              onClick={batchRerunEp ? handleBatchRerun : handleGenerate}
               disabled={!selectedPlatform}
               className="mt-4 w-full"
             >
-              生成
+              {batchRerunEp ? "开始重跑" : "生成"}
             </Button>
           </div>
         </DialogContent>

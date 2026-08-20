@@ -435,6 +435,9 @@ export function formatSceneContextAsPrompt(context: SceneVideoContext): string {
     if (sh.environment) parts.push(`环境: ${sh.environment}`);
     if (sh.cinematography) parts.push(`摄影: ${sh.cinematography}`);
     if (sh.dialogue) parts.push(`对白: "${sh.dialogue}"`);
+    if (sh.asset_id) {
+      parts.push(`生成图片: 已回传（此镜头画面可作为视频首帧/参考图，通过平台图片上传入口引用）`);
+    }
     if (sh.prompt_content) {
       parts.push(`图片 Prompt: ${sh.prompt_content}`);
     }

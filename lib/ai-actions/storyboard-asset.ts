@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateStoryboardDocument } from "@/lib/storyboard/document-generator";
-import { STORYBOARD_DOCUMENT_SYSTEM_PROMPT } from "@/lib/storyboard/document-prompt";
+import { NODE_REGISTRY } from "@/lib/ai/node-registry";
 
 /** DI 上下文 */
 export interface AIActionContext {
@@ -67,5 +67,5 @@ export async function getSceneReadiness(
   return { ready: true, missingShots: [] };
 }
 
-// 导出 System Prompt 供 context-preview 使用
-export { STORYBOARD_DOCUMENT_SYSTEM_PROMPT as STORYBOARD_ASSET_SYSTEM_PROMPT };
+// 导出 System Prompt 供 context-preview 使用（正文已迁入 node-registry: storyboard_document）
+export const STORYBOARD_ASSET_SYSTEM_PROMPT = NODE_REGISTRY.storyboard_document.defaultSystemRule;

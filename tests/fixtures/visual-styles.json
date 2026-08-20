@@ -1,47 +1,62 @@
 [
   {
     "projectId": "proj-001",
-    "name": "都市修仙暗黑风",
-    "camera_style": "手持摄影+低角度仰拍，强调主角的压迫感和力量感。动作场景用快速剪辑",
-    "color": "主色调深蓝灰+暖黄，暗部偏冷蓝，高光偏暖黄。对比度强",
-    "lighting": "低调照明，伦勃朗光。室内暗调+窗外强光反差。夜戏用城市霓虹光",
-    "cinematography": "广角+浅景深，主体清晰背景虚化。动作场景用跟随镜头。关键反转用 Dutch angle",
-    "fixed_prompt": "Dark urban cultivation style, desaturated blue-gray with warm yellow highlights, low-key Rembrandt lighting, handheld low-angle shots, shallow depth of field, neon-lit night scenes, high contrast, dramatic mood"
+    "style_key": "anime",
+    "style_name": "日漫风",
+    "tweak": "glowing spiritual energy effects, dynamic action lines, modern urban fantasy setting",
+    "name": "日漫风 · 都市修仙特调",
+    "camera_style": "动画式构图，特写与全景交替",
+    "color": "高饱和鲜艳色彩，赛璐璐上色",
+    "lighting": "明亮通透，高光阴影二分",
+    "cinematography": "key visual 级别的画面表现力",
+    "fixed_prompt": "anime style, cel shading, vibrant colors, key visual, detailed background, high quality illustration, glowing spiritual energy effects, dynamic action lines, modern urban fantasy setting"
   },
   {
     "projectId": "proj-002",
-    "name": "豪门奢华质感",
-    "camera_style": "稳定器+轨道推拉，缓慢优雅的运镜。对称构图强调仪式感",
-    "color": "主色调深红+金色+米白，暗金质感。暖色调为主，冷调点缀",
-    "lighting": "柔和面光+水晶吊灯漫射。夜戏用烛光和暖色台灯。明暗过渡柔和",
-    "cinematography": "中焦+大光圈，人物特写质感细腻。对称构图。转场用缓慢叠化",
-    "fixed_prompt": "Luxurious mansion drama style, deep red and gold with cream tones, soft diffused lighting with crystal chandelier, stabilizer and dolly shots, symmetrical composition, medium telephoto with large aperture, elegant and slow pacing, warm color palette"
+    "style_key": "live",
+    "style_name": "真人电影风",
+    "tweak": "luxurious mansion interior, opulent warm tones, elegant evening gowns",
+    "name": "真人电影风 · 豪门质感",
+    "camera_style": "电影感构图，浅景深，中近景为主",
+    "color": "自然写实色彩，低饱和",
+    "lighting": "cinematic lighting，低调布光，注重光影层次",
+    "cinematography": "35mm film 质感，写实镜头语言",
+    "fixed_prompt": "photorealistic, cinematic lighting, 35mm film, shallow depth of field, ultra detailed, realistic skin texture, luxurious mansion interior, opulent warm tones, elegant evening gowns"
   },
   {
     "projectId": "proj-003",
-    "name": "末日冷峻纪实",
-    "camera_style": "手持+肩扛摄影，纪录片质感。快速变焦和不规则构图",
-    "color": "主色调冷青绿+灰白，极度去色。仅保留火光和应急灯的暖色",
-    "lighting": "自然光为主，室内用应急灯和手电筒。强烈明暗对比",
-    "cinematography": "广角畸变+高ISO噪点质感。手持晃动增加紧张感。特写用浅景深",
-    "fixed_prompt": "Post-apocalyptic documentary style, cold cyan-green and gray-white desaturated palette, handheld shoulder-mounted camera, fast zoom and irregular framing, natural light with emergency lamp and flashlight, high ISO grain, shallow depth of field close-ups, intense and raw"
+    "style_key": "manga",
+    "style_name": "漫画风",
+    "tweak": "post-apocalyptic city ruins, high contrast ink shading, survival gear details",
+    "name": "漫画风 · 末日纪实",
+    "camera_style": "漫画分格视角，张力构图",
+    "color": "黑白灰，网点纸质感",
+    "lighting": "强对比明暗，速度线与集中线",
+    "cinematography": "bold linework，强对比线稿",
+    "fixed_prompt": "manga panel style, black and white, screentone texture, bold linework, high contrast ink illustration, post-apocalyptic city ruins, high contrast ink shading, survival gear details"
   },
   {
     "projectId": "proj-004",
-    "name": "古风治愈暖调",
-    "camera_style": "固定机位+缓慢摇移，画面平稳。多用中远景展现环境",
-    "color": "主色调暖黄+木色+青灰，饱和度适中。阳光感强烈",
-    "lighting": "自然日光+暖色补光。室外逆光和侧光。整体明亮通透",
-    "cinematography": "标准焦段+大景深，前景中景背景都清晰。构图讲究留白和对称",
-    "fixed_prompt": "Ancient Chinese healing style, warm yellow and wood tones with gray stone accents, moderate saturation, strong sunlight feel, natural daylight with warm fill light, standard focal length with deep depth of field, stable camera with slow pans, balanced composition with negative space"
+    "style_key": "guofeng",
+    "style_name": "国漫风",
+    "tweak": "ancient town marketplace, warm inviting atmosphere, delicate food illustration",
+    "name": "国漫风 · 古风市井",
+    "camera_style": "国风构图，留白与对称",
+    "color": "水墨与工笔结合的东方色彩",
+    "lighting": "柔和氛围光，仙气飘逸",
+    "cinematography": "工笔细描与水墨晕染结合",
+    "fixed_prompt": "chinese animation style, guofeng, ink wash elements, ornate details, elegant composition, soft atmospheric lighting, ancient town marketplace, warm inviting atmosphere, delicate food illustration"
   },
   {
     "projectId": "proj-005",
-    "name": "悬疑暗调冷峻",
-    "camera_style": "固定+缓慢推拉，压抑感强。大量主观镜头和过肩镜头",
-    "color": "主色调冷蓝+暗黄+灰，极低饱和度。雨夜青蓝色调",
-    "lighting": "低调照明+硬光。台灯单点光源+窗外冷光。阴影面积大",
-    "cinematography": "长焦+浅景深，空间压缩感。Dutch angle 和镜像反射构图",
-    "fixed_prompt": "Dark suspense thriller style, cold blue and dim yellow with gray, extremely low saturation, blue rain night tones, low-key lighting with hard light, single desk lamp source with cold window light, long telephoto with shallow depth of field, Dutch angles and mirror reflection compositions, oppressive atmosphere"
+    "style_key": "live",
+    "style_name": "真人电影风",
+    "tweak": "neo-noir rainy night, moody police procedural, cold blue night exteriors",
+    "name": "真人电影风 · 悬疑暗调",
+    "camera_style": "电影感构图，浅景深，中近景为主",
+    "color": "自然写实色彩，低饱和",
+    "lighting": "cinematic lighting，低调布光，注重光影层次",
+    "cinematography": "35mm film 质感，写实镜头语言",
+    "fixed_prompt": "photorealistic, cinematic lighting, 35mm film, shallow depth of field, ultra detailed, realistic skin texture, neo-noir rainy night, moody police procedural, cold blue night exteriors"
   }
 ]

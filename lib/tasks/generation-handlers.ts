@@ -13,6 +13,10 @@ import {
 } from "@/lib/ai-actions/assets";
 import { generateScript } from "@/lib/ai-actions/script";
 import {
+  generateEpisodePlot,
+  generateEpisodeShotOutline,
+} from "@/lib/ai-actions/episode-plot";
+import {
   generateStoryboard,
   generateEpisodeStoryboard,
   type AIActionContext as StoryboardActionContext,
@@ -116,6 +120,24 @@ export async function executeGenerationTask(
 
       case "generate_script":
         await generateScript(task.project_id, task.user_id, ctx);
+        break;
+
+      case "generate_episode_plot":
+        await generateEpisodePlot(
+          task.project_id,
+          payload.episodeNumber as number,
+          task.user_id,
+          ctx
+        );
+        break;
+
+      case "generate_episode_outline":
+        await generateEpisodeShotOutline(
+          task.project_id,
+          payload.episodeNumber as number,
+          task.user_id,
+          ctx
+        );
         break;
 
       case "generate_storyboard":
